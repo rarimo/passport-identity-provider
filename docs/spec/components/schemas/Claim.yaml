@@ -1,0 +1,13 @@
+allOf:
+  - $ref: '#/components/schemas/ClaimKey'
+  - type: object
+    required:
+      - attributes
+    properties:
+      attributes:
+        type: object
+        required:
+          - claim_id
+        properties:
+          claim_id:
+            type: string

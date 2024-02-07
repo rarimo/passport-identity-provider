@@ -1,0 +1,16 @@
+log:
+  level: debug
+  disable_sentry: true
+
+db:
+  url: db_url
+
+listener:
+  addr: :8000
+
+cop:
+  disabled: true
+  endpoint: "http://..."
+  upstream: "http://..."
+  service_name: identity-provider-service
+  service_port: 80

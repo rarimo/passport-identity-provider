@@ -1,0 +1,12 @@
+in: query
+name: 'page[order]'
+required: false
+schema:
+  type: string
+  enum:
+    - asc
+    - desc
+  default: desc
+  description: >-
+    Order of records on the page. If sortingParam is not specified, order of
+    records is by default sorted by ID.

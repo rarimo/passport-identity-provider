@@ -1,0 +1,9 @@
+in: query
+name: 'page[limit]'
+required: false
+schema:
+  type: integer
+  minimum: 1
+  maximum: 100
+  default: 15
+  description: Numbers of items per page to return.

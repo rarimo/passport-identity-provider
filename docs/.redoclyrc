@@ -1,0 +1,9 @@
+
+apiTitle: identity-provider-service
+splitSpec: true
+codeSamples: false
+swaggerUI: true
+travis: true
+repo: tokend/notifications/notifications-router-svc
+oasVersion: 1.0.0
+
