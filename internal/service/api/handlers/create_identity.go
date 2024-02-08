@@ -1,15 +1,20 @@
 package handlers
 
 import (
+	"bytes"
 	"crypto"
 	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/x509"
+	"encoding/asn1"
+	"encoding/hex"
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
+	"math/big"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/RarimoVoting/identity-provider-service/internal/config"
@@ -31,19 +36,23 @@ func CreateIdentity(w http.ResponseWriter, r *http.Request) {
 
 	cfg := VerifierConfig(r)
 
+	if err := verifySHA256WithRSA(req); err != nil {
+		Log(r).WithError(err).Error("failed to verify SHA256 with RSA")
+		ape.RenderErr(w, problems.InternalError())
+		return
+	}
+
 	if err := verifier.VerifyGroth16(req.Data.ZKProof, cfg.VerificationKey); err != nil {
 		Log(r).WithError(err).Debug("failed to verify Groth16")
 		ape.RenderErr(w, problems.BadRequest(err)...)
 		return
 	}
 
-	if err := validatePubInputs(cfg, req.Data.ZKProof.PubSignals); err != nil {
-		Log(r).WithError(err).Debug("failed to validate pub inputs")
+	if err := validatePubSignals(cfg, req.Data); err != nil {
+		Log(r).WithError(err).Debug("failed to validate pub signals")
 		ape.RenderErr(w, problems.BadRequest(err)...)
 		return
 	}
-
-	// TODO: Verify if the DG1 hash is the same as the one in the proof
 
 	if err := validateCert([]byte(req.Data.IDCardSOD.PemFile), cfg.MasterCerts); err != nil {
 		Log(r).WithError(err).Error("failed to validate certificate")
@@ -53,7 +62,7 @@ func CreateIdentity(w http.ResponseWriter, r *http.Request) {
 
 	iss := Issuer(r)
 
-	identityExpiration, err := getExpirationTimeFromPubInputs(req.Data.ZKProof.PubSignals)
+	identityExpiration, err := getExpirationTimeFromPubSignals(req.Data.ZKProof.PubSignals)
 	if err != nil {
 		Log(r).WithError(err).Error("failed to get expiration time")
 		ape.RenderErr(w, problems.BadRequest(err)...)
@@ -105,6 +114,7 @@ func writeProof(r *http.Request, req requests.CreateIdentityRequest) error {
 	}
 
 	if err := ProofsQ(r).New().Insert(data.Proof{
+		DID:        req.Data.ID,
 		Data:       proofData,
 		PubSignals: pubSignals,
 		IDCardSOD:  idCardSOD,
@@ -115,9 +125,8 @@ func writeProof(r *http.Request, req requests.CreateIdentityRequest) error {
 	return nil
 }
 
-// TODO
-func verifySHA256WithRSA(certPem, message, signature []byte) error {
-	block, _ := pem.Decode(certPem)
+func verifySHA256WithRSA(req requests.CreateIdentityRequest) error {
+	block, _ := pem.Decode([]byte(req.Data.IDCardSOD.PemFile))
 	if block == nil {
 		return fmt.Errorf("invalid certificate: invalid PEM")
 	}
@@ -129,9 +138,19 @@ func verifySHA256WithRSA(certPem, message, signature []byte) error {
 
 	pubKey := cert.PublicKey.(*rsa.PublicKey)
 
+	messageBytes, err := hex.DecodeString(req.Data.IDCardSOD.SignedAttributes)
+	if err != nil {
+		return errors.Wrap(err, "failed to decode hex string")
+	}
+
 	h := sha256.New()
-	h.Write(message)
+	h.Write(messageBytes)
 	d := h.Sum(nil)
+
+	signature, err := hex.DecodeString(req.Data.IDCardSOD.Signature)
+	if err != nil {
+		return errors.Wrap(err, "failed to decode hex string")
+	}
 
 	if err := rsa.VerifyPKCS1v15(pubKey, crypto.SHA256, d, signature); err != nil {
 		return errors.Wrap(err, "failed to verify signature")
@@ -168,34 +187,58 @@ func validateCert(certPem []byte, masterCertsPem []byte) error {
 	return nil
 }
 
-func validatePubInputs(cfg *config.VerifierConfig, pubInputs []string) error {
-	if err := validatePubInputsCurrentDate(pubInputs); err != nil {
+func validatePubSignals(cfg *config.VerifierConfig, requestData requests.CreateIdentityRequestData) error {
+	if err := validatePubSignalsDG1Hash(requestData.IDCardSOD.EncapsulatedContent, requestData.ZKProof.PubSignals); err != nil {
+		return errors.Wrap(err, "failed to validate DG1 hash")
+	}
+
+	if err := validatePubSignalsCurrentDate(requestData.ZKProof.PubSignals); err != nil {
 		return fmt.Errorf("invalid current date: %w", err)
 	}
 
-	age, err := strconv.Atoi(pubInputs[9])
-	if err != nil {
-		return errors.Wrap(err, "failed to convert pub input to int")
-	}
-	if age < cfg.AllowedAge {
-		return errors.New("invalid age")
+	if err := validatePubSignalsAge(cfg, requestData.ZKProof.PubSignals[9]); err != nil {
+		return errors.Wrap(err, "failed to validate pub signals age")
 	}
 
 	return nil
 }
 
-func validatePubInputsCurrentDate(pubInputs []string) error {
-	year, err := strconv.Atoi(pubInputs[3])
+func validatePubSignalsDG1Hash(encapsulatedContent string, pubSignals []string) error {
+	encapsulatedContentBytes, err := hex.DecodeString(encapsulatedContent)
+	if err != nil {
+		return errors.Wrap(err, "failed to decode hex string")
+	}
+
+	encapsulatedData := resources.EncapsulatedData{}
+	_, err = asn1.Unmarshal(encapsulatedContentBytes, &encapsulatedData)
+	if err != nil {
+		return errors.Wrap(err, "failed to unmarshal ASN.1")
+	}
+
+	ints, err := stringsToArrayBigInt([]string{pubSignals[0], pubSignals[1]})
+	hashBytes := make([]byte, 0)
+	hashBytes = append(hashBytes, ints[0].Bytes()...)
+	hashBytes = append(hashBytes, ints[1].Bytes()...)
+
+	if !bytes.Equal(encapsulatedData.PrivateKey.El1.OctetStr.Bytes, hashBytes) {
+		return errors.New("encapsulated data and proof pub signals hashes are different")
+	}
+
+	return nil
+}
+
+func validatePubSignalsCurrentDate(pubSignals []string) error {
+	year, err := strconv.Atoi(pubSignals[3])
 	if err != nil {
 		return fmt.Errorf("invalid year: %w", err)
 	}
 
-	month, err := strconv.Atoi(pubInputs[4])
+	month, err := strconv.Atoi(pubSignals[4])
 	if err != nil {
 		return fmt.Errorf("invalid month: %w", err)
 	}
 
-	day, err := strconv.Atoi(pubInputs[5])
+	day, err := strconv.Atoi(pubSignals[5])
 	if err != nil {
 		return fmt.Errorf("invalid day: %w", err)
 	}
@@ -217,18 +260,29 @@ func validatePubInputsCurrentDate(pubInputs []string) error {
 	return nil
 }
 
-func getExpirationTimeFromPubInputs(pubInputs []string) (*time.Time, error) {
-	year, err := strconv.Atoi(pubInputs[6])
+func validatePubSignalsAge(cfg *config.VerifierConfig, agePubSignal string) error {
+	age, err := strconv.Atoi(agePubSignal)
+	if err != nil {
+		return errors.Wrap(err, "failed to convert pub input to int")
+	}
+	if age < cfg.AllowedAge {
+		return errors.New("invalid age")
+	}
+	return nil
+}
+
+func getExpirationTimeFromPubSignals(pubSignals []string) (*time.Time, error) {
+	year, err := strconv.Atoi(pubSignals[6])
 	if err != nil {
 		return nil, fmt.Errorf("invalid year: %w", err)
 	}
 
-	month, err := strconv.Atoi(pubInputs[7])
+	month, err := strconv.Atoi(pubSignals[7])
 	if err != nil {
 		return nil, fmt.Errorf("invalid month: %w", err)
 	}
 
-	day, err := strconv.Atoi(pubInputs[8])
+	day, err := strconv.Atoi(pubSignals[8])
 	if err != nil {
 		return nil, fmt.Errorf("invalid day: %w", err)
 	}
@@ -236,4 +290,29 @@ func getExpirationTimeFromPubInputs(pubInputs []string) (*time.Time, error) {
 	expirationDate := time.Date(2000+year, time.Month(month), day, 0, 0, 0, 0, time.UTC)
 
 	return &expirationDate, nil
+}
+
+func stringsToArrayBigInt(publicSignals []string) ([]*big.Int, error) {
+	p := make([]*big.Int, 0, len(publicSignals))
+	for _, s := range publicSignals {
+		sb, err := stringToBigInt(s)
+		if err != nil {
+			return nil, err
+		}
+		p = append(p, sb)
+	}
+	return p, nil
+}
+
+func stringToBigInt(s string) (*big.Int, error) {
+	base := 10
+	if bytes.HasPrefix([]byte(s), []byte("0x")) {
+		base = 16
+		s = strings.TrimPrefix(s, "0x")
+	}
+	n, ok := new(big.Int).SetString(s, base)
+	if !ok {
+		return nil, fmt.Errorf("can not parse string to *big.Int: %s", s)
+	}
+	return n, nil
 }

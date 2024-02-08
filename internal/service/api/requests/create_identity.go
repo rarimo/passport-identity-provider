@@ -11,10 +11,11 @@ type CreateIdentityRequestData struct {
 	ID        string             `json:"id"`
 	ZKProof   snarkTypes.ZKProof `json:"zkproof"`
 	IDCardSOD struct {
-		Asn1Data  string `json:"asn1data"`
-		Algorithm string `json:"algorithm"`
-		Signature string `json:"signature"`
-		PemFile   string `json:"pemFile"`
+		SignedAttributes    string `json:"signed_attributes"`
+		Algorithm           string `json:"algorithm"`
+		Signature           string `json:"signature"`
+		PemFile             string `json:"pem_file"`
+		EncapsulatedContent string `json:"encapsulated_content"`
 	} `json:"id_card_sod"`
 }
 

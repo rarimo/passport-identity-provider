@@ -1,0 +1,101 @@
+post:
+  tags:
+    - Identity
+  summary: The identity creating
+  operationId: create-identity
+  requestBody:
+    content:
+      application/json:
+        schema:
+          type: object
+          required:
+            - data
+          properties:
+            data:
+              type: object
+              required:
+                - id
+                - id_card_sod
+                - zkproof
+              properties:
+                id:
+                  type: string
+                id_card_sod:
+                  type: object
+                  required:
+                    - signed_attributes
+                    - algorithm
+                    - signature
+                    - pem_file
+                    - encapsulated_content
+                  properties:
+                    signed_attributes:
+                      type: string
+                    algorithm:
+                      type: string
+                    signature:
+                      type: string
+                    pem_file:
+                      type: string
+                    encapsulated_content:
+                      type: string
+                zkproof:
+                  type: object
+                  required:
+                    - proof
+                    - pub_signals
+                  properties:
+                    proof:
+                      type: object
+                      required:
+                        - pi_a
+                        - pi_b
+                        - pi_c
+                        - protocol
+                        - curve
+                      properties:
+                        pi_a:
+                          type: array
+                          items:
+                            type: string
+                        pi_b:
+                          type: array
+                          items:
+                            type: array
+                            items:
+                              type: string
+                        pi_c:
+                          type: array
+                          items:
+                            type: string
+                        protocol:
+                          type: string
+                        curve:
+                          type: string
+                    pub_signals:
+                      type: array
+                      items:
+                        type: string
+  responses:
+    '200':
+      description: Success
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              data:
+                type: object
+                $ref: '#/components/schemas/Claim'
+    '500':
+      description: Internal Error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Errors'
+    '400':
+      description: Bad Request Error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Errors'
