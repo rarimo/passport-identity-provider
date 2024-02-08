@@ -23,7 +23,8 @@ type CredentialRequest struct {
 }
 
 type CredentialSubject struct {
-	ID               string `json:"id"`
-	IsAdult          bool   `json:"isAdult"`
-	IssuingAuthority string `json:"issuingAuthority"`
+	ID                string `json:"id"`
+	IsAdult           bool   `json:"isAdult"`
+	IssuingAuthority  string `json:"issuingAuthority"`
+	DocumentNullifier string `json:"documentNullifier""`
 }
