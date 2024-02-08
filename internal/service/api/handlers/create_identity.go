@@ -54,7 +54,7 @@ func CreateIdentity(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := validateCert([]byte(req.Data.IDCardSOD.PemFile), cfg.MasterCerts); err != nil {
+	if err := validateCert([]byte(req.Data.DocumentSOD.PemFile), cfg.MasterCerts); err != nil {
 		Log(r).WithError(err).Error("failed to validate certificate")
 		ape.RenderErr(w, problems.BadRequest(err)...)
 		return
@@ -108,16 +108,16 @@ func writeProof(r *http.Request, req requests.CreateIdentityRequest) error {
 		return errors.Wrap(err, "failed to marshal JSON")
 	}
 
-	idCardSOD, err := json.Marshal(req.Data.IDCardSOD)
+	DocumentSOD, err := json.Marshal(req.Data.DocumentSOD)
 	if err != nil {
 		return errors.Wrap(err, "failed to marshal JSON")
 	}
 
 	if err := ProofsQ(r).New().Insert(data.Proof{
-		DID:        req.Data.ID,
-		Data:       proofData,
-		PubSignals: pubSignals,
-		IDCardSOD:  idCardSOD,
+		DID:         req.Data.ID,
+		Data:        proofData,
+		PubSignals:  pubSignals,
+		DocumentSOD: DocumentSOD,
 	}); err != nil {
 		return errors.Wrap(err, "failed to insert proof in the database")
 	}
@@ -126,7 +126,7 @@ func writeProof(r *http.Request, req requests.CreateIdentityRequest) error {
 }
 
 func verifySHA256WithRSA(req requests.CreateIdentityRequest) error {
-	block, _ := pem.Decode([]byte(req.Data.IDCardSOD.PemFile))
+	block, _ := pem.Decode([]byte(req.Data.DocumentSOD.PemFile))
 	if block == nil {
 		return fmt.Errorf("invalid certificate: invalid PEM")
 	}
@@ -138,7 +138,7 @@ func verifySHA256WithRSA(req requests.CreateIdentityRequest) error {
 
 	pubKey := cert.PublicKey.(*rsa.PublicKey)
 
-	messageBytes, err := hex.DecodeString(req.Data.IDCardSOD.SignedAttributes)
+	messageBytes, err := hex.DecodeString(req.Data.DocumentSOD.SignedAttributes)
 	if err != nil {
 		return errors.Wrap(err, "failed to decode hex string")
 	}
@@ -147,7 +147,7 @@ func verifySHA256WithRSA(req requests.CreateIdentityRequest) error {
 	h.Write(messageBytes)
 	d := h.Sum(nil)
 
-	signature, err := hex.DecodeString(req.Data.IDCardSOD.Signature)
+	signature, err := hex.DecodeString(req.Data.DocumentSOD.Signature)
 	if err != nil {
 		return errors.Wrap(err, "failed to decode hex string")
 	}
@@ -188,7 +188,7 @@ func validateCert(certPem []byte, masterCertsPem []byte) error {
 }
 
 func validatePubSignals(cfg *config.VerifierConfig, requestData requests.CreateIdentityRequestData) error {
-	if err := validatePubSignalsDG1Hash(requestData.IDCardSOD.EncapsulatedContent, requestData.ZKProof.PubSignals); err != nil {
+	if err := validatePubSignalsDG1Hash(requestData.DocumentSOD.EncapsulatedContent, requestData.ZKProof.PubSignals); err != nil {
 		return errors.Wrap(err, "failed to validate DG1 hash")
 	}
 

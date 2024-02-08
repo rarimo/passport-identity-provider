@@ -8,15 +8,15 @@ import (
 )
 
 type CreateIdentityRequestData struct {
-	ID        string             `json:"id"`
-	ZKProof   snarkTypes.ZKProof `json:"zkproof"`
-	IDCardSOD struct {
+	ID          string             `json:"id"`
+	ZKProof     snarkTypes.ZKProof `json:"zkproof"`
+	DocumentSOD struct {
 		SignedAttributes    string `json:"signed_attributes"`
 		Algorithm           string `json:"algorithm"`
 		Signature           string `json:"signature"`
 		PemFile             string `json:"pem_file"`
 		EncapsulatedContent string `json:"encapsulated_content"`
-	} `json:"id_card_sod"`
+	} `json:"document_sod"`
 }
 
 type CreateIdentityRequest struct {

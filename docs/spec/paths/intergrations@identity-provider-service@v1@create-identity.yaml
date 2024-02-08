@@ -15,12 +15,12 @@ post:
               type: object
               required:
                 - id
-                - id_card_sod
+                - document_sod
                 - zkproof
               properties:
                 id:
                   type: string
-                id_card_sod:
+                document_sod:
                   type: object
                   required:
                     - signed_attributes
