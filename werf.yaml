@@ -2,7 +2,7 @@ configVersion: 1
 project: 'backend'
 ---
 image: builder
-from: golang:1.20-alpine
+from: golang:1.21.6-alpine
 docker:
   WORKDIR: /go/src/github.com/RarimoVoting/identity-provider-service
 git:
