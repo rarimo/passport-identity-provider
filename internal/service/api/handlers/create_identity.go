@@ -216,6 +216,10 @@ func validatePubSignalsDG1Hash(encapsulatedContent string, pubSignals []string) 
 	}
 
 	ints, err := stringsToArrayBigInt([]string{pubSignals[0], pubSignals[1]})
+	if err != nil {
+		return errors.Wrap(err, "failed to convert strings to big integers")
+	}
+
 	hashBytes := make([]byte, 0)
 	hashBytes = append(hashBytes, ints[0].Bytes()...)
 	hashBytes = append(hashBytes, ints[1].Bytes()...)
