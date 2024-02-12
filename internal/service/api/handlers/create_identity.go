@@ -84,8 +84,15 @@ func CreateIdentity(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	issuingAuthority, err := strconv.Atoi(req.Data.ZKProof.PubSignals[2])
+	if err != nil {
+		Log(r).WithError(err).Error("failed to convert string to int")
+		ape.RenderErr(w, problems.InternalError())
+		return
+	}
+
 	id, err := iss.IssueClaim(
-		req.Data.ID, cfg.IssuingAuthority, true, identityExpiration,
+		req.Data.ID, int64(issuingAuthority), true, identityExpiration,
 		encapsulatedData.PrivateKey.El2.OctetStr.Bytes,
 	)
 	if err != nil {

@@ -1,7 +1,6 @@
 verifier:
   verification_key_path: "./verification_key.json"
   master_certs_path: "./masterList.dev.pem"
-  issuing_authority: 123456
   allowed_age: 18
 
 issuer:
