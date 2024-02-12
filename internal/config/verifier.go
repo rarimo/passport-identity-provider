@@ -14,7 +14,7 @@ type VerifierConfiger interface {
 type VerifierConfig struct {
 	VerificationKey  []byte
 	MasterCerts      []byte
-	IssuingAuthority string
+	IssuingAuthority int64
 	AllowedAge       int
 }
 
@@ -34,7 +34,7 @@ func (v *verifier) VerifierConfig() *VerifierConfig {
 		newCfg := struct {
 			VerificationKeyPath string `fig:"verification_key_path,required"`
 			MasterCertsPath     string `fig:"master_certs_path,required"`
-			IssuingAuthority    string `fig:"issuing_authority,required"`
+			IssuingAuthority    int64  `fig:"issuing_authority,required"`
 			AllowedAge          int    `fig:"allowed_age,required"`
 		}{}
 
