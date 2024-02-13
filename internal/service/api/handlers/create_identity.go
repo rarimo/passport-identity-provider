@@ -18,10 +18,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/RarimoVoting/certificate-transparency-go/x509"
 	"github.com/RarimoVoting/identity-provider-service/internal/config"
 	"github.com/RarimoVoting/identity-provider-service/internal/data"
 	"github.com/RarimoVoting/identity-provider-service/internal/service/api/requests"
-	"github.com/RarimoVoting/identity-provider-service/internal/x509"
 	"github.com/RarimoVoting/identity-provider-service/resources"
 	"github.com/iden3/go-rapidsnark/verifier"
 	"gitlab.com/distributed_lab/ape"
@@ -30,9 +30,19 @@ import (
 )
 
 const (
-	SHA256withRSA = "SHA256withRSA"
-	SHA1withECDSA = "ecdsa-with-SHA1"
+	SHA256withRSA   = "SHA256withRSA"
+	SHA1withECDSA   = "ecdsa-with-SHA1"
+	SHA256withECDSA = "SHA256withECDSA"
 )
+
+var algorithms = map[string]string{
+	"SHA256withRSA": SHA256withRSA,
+
+	"SHA1withECDSA":   SHA1withECDSA,
+	"ecdsa-with-SHA1": SHA1withECDSA,
+
+	"SHA256withECDSA": SHA256withECDSA,
+}
 
 func CreateIdentity(w http.ResponseWriter, r *http.Request) {
 	req, err := requests.NewCreateIdentityRequest(r)
@@ -44,7 +54,7 @@ func CreateIdentity(w http.ResponseWriter, r *http.Request) {
 	cfg := VerifierConfig(r)
 
 	if err := verifySignature(req); err != nil {
-		Log(r).WithError(err).Error("failed to verify SHA256 with RSA")
+		Log(r).WithError(err).Error("failed to verify signature")
 		ape.RenderErr(w, problems.InternalError())
 		return
 	}
@@ -178,7 +188,7 @@ func verifySignature(req requests.CreateIdentityRequest) error {
 		return errors.Wrap(err, "failed to decode hex string")
 	}
 
-	switch req.Data.DocumentSOD.Algorithm {
+	switch algorithms[req.Data.DocumentSOD.Algorithm] {
 	case SHA256withRSA:
 		pubKey := cert.PublicKey.(*rsa.PublicKey)
 
@@ -187,7 +197,7 @@ func verifySignature(req requests.CreateIdentityRequest) error {
 		d := h.Sum(nil)
 
 		if err := rsa.VerifyPKCS1v15(pubKey, crypto.SHA256, d, signature); err != nil {
-			return errors.Wrap(err, "failed to verify signature")
+			return errors.Wrap(err, "failed to verify SHA256 with RSA signature")
 		}
 	case SHA1withECDSA:
 		pubKey := cert.PublicKey.(*ecdsa.PublicKey)
@@ -197,8 +207,20 @@ func verifySignature(req requests.CreateIdentityRequest) error {
 		d := h.Sum(nil)
 
 		if !ecdsa.VerifyASN1(pubKey, d, signature) {
-			return errors.New("failed to verify signature")
+			return errors.New("failed to verify SHA1 with ECDSA signature")
 		}
+	case SHA256withECDSA:
+		pubKey := cert.PublicKey.(*ecdsa.PublicKey)
+
+		h := sha256.New()
+		h.Write(messageBytes)
+		d := h.Sum(nil)
+
+		if !ecdsa.VerifyASN1(pubKey, d, signature) {
+			return errors.New("failed to verify SHA256 with ECDSA signature")
+		}
+	default:
+		return errors.New("unsupported algorithm")
 	}
 
 	return nil
