@@ -2,9 +2,9 @@ package handlers
 
 import (
 	"context"
-	"github.com/RarimoVoting/identity-provider-service/internal/config"
-	"github.com/RarimoVoting/identity-provider-service/internal/data"
-	"github.com/RarimoVoting/identity-provider-service/internal/service/issuer"
+	"github.com/rarimo/passport-identity-provider/internal/config"
+	"github.com/rarimo/passport-identity-provider/internal/data"
+	"github.com/rarimo/passport-identity-provider/internal/service/issuer"
 	"gitlab.com/distributed_lab/logan/v3"
 	"net/http"
 )

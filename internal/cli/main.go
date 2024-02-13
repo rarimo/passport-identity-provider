@@ -1,8 +1,8 @@
 package cli
 
 import (
-	"github.com/RarimoVoting/identity-provider-service/internal/config"
-	"github.com/RarimoVoting/identity-provider-service/internal/service"
+	"github.com/rarimo/passport-identity-provider/internal/config"
+	"github.com/rarimo/passport-identity-provider/internal/service"
 	"gitlab.com/distributed_lab/logan/v3"
 
 	"github.com/alecthomas/kingpin"

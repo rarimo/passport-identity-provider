@@ -1,4 +1,4 @@
-module github.com/RarimoVoting/identity-provider-service
+module github.com/rarimo/passport-identity-provider
 
 go 1.21.6
 

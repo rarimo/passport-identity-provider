@@ -35,4 +35,4 @@ jobs:
       - name: Run Build
         run: |
           . $(werf ci-env github --as-file)
-          werf export service --tag ghcr.io/rarimovoting/identity-provider-service:$GITHUB_SHA
+          werf export service --tag ghcr.io/rarimo/passport-identity-provider:$GITHUB_SHA

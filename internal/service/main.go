@@ -1,7 +1,7 @@
 package service
 
 import (
-	"github.com/RarimoVoting/identity-provider-service/internal/config"
+	"github.com/rarimo/passport-identity-provider/internal/config"
 	"net"
 	"net/http"
 
