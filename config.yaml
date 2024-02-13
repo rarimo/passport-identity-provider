@@ -1,9 +1,21 @@
+verifier:
+  verification_key_path: "./verification_key.json"
+  master_certs_path: "./masterList.dev.pem"
+  allowed_age: 18
+
+issuer:
+  base_url: "http://localhost:3002/v1"
+  auth_username: ""
+  auth_password: ""
+  claim_type: "VotingCredential"
+  credential_schema: "https://bafybeibbniic63etdbcn5rs5ir5bhelym6ogv46afj35keatzhn2eqnioi.ipfs.w3s.link/VotingCredential.json"
+
 log:
   level: debug
   disable_sentry: true
 
 db:
-  url: db_url
+  url: postgres://voting:voting@localhost:35432/voting?sslmode=disable
 
 listener:
   addr: :8000

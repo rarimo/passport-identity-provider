@@ -1,11 +1,14 @@
 package issuer
 
 import (
+	"math/big"
+	"time"
+
 	"github.com/RarimoVoting/identity-provider-service/internal/config"
+	"github.com/iden3/go-iden3-crypto/poseidon"
 	"github.com/imroc/req/v3"
 	"gitlab.com/distributed_lab/logan/v3"
 	"gitlab.com/distributed_lab/logan/v3/errors"
-	"time"
 )
 
 type Issuer struct {
@@ -24,17 +27,34 @@ func New(log *logan.Entry, config *config.IssuerConfig) *Issuer {
 }
 
 func (is *Issuer) IssueClaim(
-	id, issuingAuthority string, isAdult bool, expiration *time.Time,
+	id string, issuingAuthority int64, isAdult bool, expiration *time.Time, dg2 []byte,
 ) (string, error) {
 	var result UUIDResponse
+
+	nullifierHash, err := poseidon.HashBytes(dg2)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to hash bytes")
+	}
+
+	credHashInput := make([]byte, 0)
+	credHashInput = append(credHashInput, 1)
+	credHashInput = append(credHashInput, big.NewInt(issuingAuthority).Bytes()...)
+	credHashInput = append(credHashInput, nullifierHash.Bytes()...)
+
+	credentialHash, err := poseidon.HashBytes(credHashInput)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to hash bytes")
+	}
 
 	credentialRequest := CredentialRequest{
 		CredentialSchema: is.cfg.CredentialSchema,
 		Type:             is.cfg.ClaimType,
 		CredentialSubject: CredentialSubject{
-			ID:               id,
-			IssuingAuthority: issuingAuthority,
-			IsAdult:          isAdult,
+			ID:                id,
+			IssuingAuthority:  issuingAuthority,
+			IsAdult:           isAdult,
+			DocumentNullifier: nullifierHash.String(),
+			CredentialHash:    credentialHash.String(),
 		},
 		Expiration:     expiration,
 		MtProof:        true,

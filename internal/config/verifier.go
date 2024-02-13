@@ -12,10 +12,9 @@ type VerifierConfiger interface {
 }
 
 type VerifierConfig struct {
-	VerificationKey  []byte
-	MasterCerts      []byte
-	IssuingAuthority string
-	AllowedAge       int
+	VerificationKey []byte
+	MasterCerts     []byte
+	AllowedAge      int
 }
 
 type verifier struct {
@@ -34,7 +33,6 @@ func (v *verifier) VerifierConfig() *VerifierConfig {
 		newCfg := struct {
 			VerificationKeyPath string `fig:"verification_key_path,required"`
 			MasterCertsPath     string `fig:"master_certs_path,required"`
-			IssuingAuthority    string `fig:"issuing_authority,required"`
 			AllowedAge          int    `fig:"allowed_age,required"`
 		}{}
 
@@ -57,10 +55,9 @@ func (v *verifier) VerifierConfig() *VerifierConfig {
 		}
 
 		return &VerifierConfig{
-			VerificationKey:  verificationKey,
-			MasterCerts:      masterCerts,
-			IssuingAuthority: newCfg.IssuingAuthority,
-			AllowedAge:       newCfg.AllowedAge,
+			VerificationKey: verificationKey,
+			MasterCerts:     masterCerts,
+			AllowedAge:      newCfg.AllowedAge,
 		}
 	}).(*VerifierConfig)
 }
