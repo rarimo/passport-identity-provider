@@ -29,9 +29,12 @@ import (
 	"gitlab.com/distributed_lab/logan/v3/errors"
 )
 
+// Full list of the OpenSSL signature algorithms and hash-functions is provided here:
+// https://www.openssl.org/docs/man1.1.1/man3/SSL_CTX_set1_sigalgs_list.html
+
 const (
 	SHA256withRSA   = "SHA256withRSA"
-	SHA1withECDSA   = "ecdsa-with-SHA1"
+	SHA1withECDSA   = "SHA1withECDSA"
 	SHA256withECDSA = "SHA256withECDSA"
 )
 
@@ -220,7 +223,7 @@ func verifySignature(req requests.CreateIdentityRequest) error {
 			return errors.New("failed to verify SHA256 with ECDSA signature")
 		}
 	default:
-		return errors.New("unsupported algorithm")
+		return errors.New(fmt.Sprintf("%s is unsupported algorithm", req.Data.DocumentSOD.Algorithm))
 	}
 
 	return nil
