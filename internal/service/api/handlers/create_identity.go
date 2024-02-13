@@ -3,9 +3,10 @@ package handlers
 import (
 	"bytes"
 	"crypto"
+	"crypto/ecdsa"
 	"crypto/rsa"
+	"crypto/sha1"
 	"crypto/sha256"
-	"crypto/x509"
 	"encoding/asn1"
 	"encoding/hex"
 	"encoding/json"
@@ -22,10 +23,29 @@ import (
 	"github.com/RarimoVoting/identity-provider-service/internal/service/api/requests"
 	"github.com/RarimoVoting/identity-provider-service/resources"
 	"github.com/iden3/go-rapidsnark/verifier"
+	"github.com/rarimo/certificate-transparency-go/x509"
 	"gitlab.com/distributed_lab/ape"
 	"gitlab.com/distributed_lab/ape/problems"
 	"gitlab.com/distributed_lab/logan/v3/errors"
 )
+
+// Full list of the OpenSSL signature algorithms and hash-functions is provided here:
+// https://www.openssl.org/docs/man1.1.1/man3/SSL_CTX_set1_sigalgs_list.html
+
+const (
+	SHA256withRSA   = "SHA256withRSA"
+	SHA1withECDSA   = "SHA1withECDSA"
+	SHA256withECDSA = "SHA256withECDSA"
+)
+
+var algorithms = map[string]string{
+	"SHA256withRSA": SHA256withRSA,
+
+	"SHA1withECDSA":   SHA1withECDSA,
+	"ecdsa-with-SHA1": SHA1withECDSA,
+
+	"SHA256withECDSA": SHA256withECDSA,
+}
 
 func CreateIdentity(w http.ResponseWriter, r *http.Request) {
 	req, err := requests.NewCreateIdentityRequest(r)
@@ -36,8 +56,8 @@ func CreateIdentity(w http.ResponseWriter, r *http.Request) {
 
 	cfg := VerifierConfig(r)
 
-	if err := verifySHA256WithRSA(req); err != nil {
-		Log(r).WithError(err).Error("failed to verify SHA256 with RSA")
+	if err := verifySignature(req); err != nil {
+		Log(r).WithError(err).Error("failed to verify signature")
 		ape.RenderErr(w, problems.InternalError())
 		return
 	}
@@ -48,7 +68,22 @@ func CreateIdentity(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := validatePubSignals(cfg, req.Data); err != nil {
+	encapsulatedContentBytes, err := hex.DecodeString(req.Data.DocumentSOD.EncapsulatedContent)
+	if err != nil {
+		Log(r).WithError(err).Error("failed to decode hex string")
+		ape.RenderErr(w, problems.InternalError())
+		return
+	}
+
+	encapsulatedData := resources.EncapsulatedData{}
+	_, err = asn1.Unmarshal(encapsulatedContentBytes, &encapsulatedData)
+	if err != nil {
+		Log(r).WithError(err).Error("failed to unmarshal ASN.1")
+		ape.RenderErr(w, problems.InternalError())
+		return
+	}
+
+	if err := validatePubSignals(cfg, req.Data, encapsulatedData.PrivateKey.El1.OctetStr.Bytes); err != nil {
 		Log(r).WithError(err).Debug("failed to validate pub signals")
 		ape.RenderErr(w, problems.BadRequest(err)...)
 		return
@@ -69,7 +104,17 @@ func CreateIdentity(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id, err := iss.IssueClaim(req.Data.ID, cfg.IssuingAuthority, true, identityExpiration)
+	issuingAuthority, err := strconv.Atoi(req.Data.ZKProof.PubSignals[2])
+	if err != nil {
+		Log(r).WithError(err).Error("failed to convert string to int")
+		ape.RenderErr(w, problems.InternalError())
+		return
+	}
+
+	id, err := iss.IssueClaim(
+		req.Data.ID, int64(issuingAuthority), true, identityExpiration,
+		encapsulatedData.PrivateKey.El2.OctetStr.Bytes,
+	)
 	if err != nil {
 		Log(r).WithError(err).Error("failed to issue voting claim")
 		ape.RenderErr(w, problems.InternalError())
@@ -125,7 +170,7 @@ func writeProof(r *http.Request, req requests.CreateIdentityRequest) error {
 	return nil
 }
 
-func verifySHA256WithRSA(req requests.CreateIdentityRequest) error {
+func verifySignature(req requests.CreateIdentityRequest) error {
 	block, _ := pem.Decode([]byte(req.Data.DocumentSOD.PemFile))
 	if block == nil {
 		return fmt.Errorf("invalid certificate: invalid PEM")
@@ -136,24 +181,49 @@ func verifySHA256WithRSA(req requests.CreateIdentityRequest) error {
 		return fmt.Errorf("invalid certificate: %w", err)
 	}
 
-	pubKey := cert.PublicKey.(*rsa.PublicKey)
-
 	messageBytes, err := hex.DecodeString(req.Data.DocumentSOD.SignedAttributes)
 	if err != nil {
 		return errors.Wrap(err, "failed to decode hex string")
 	}
-
-	h := sha256.New()
-	h.Write(messageBytes)
-	d := h.Sum(nil)
 
 	signature, err := hex.DecodeString(req.Data.DocumentSOD.Signature)
 	if err != nil {
 		return errors.Wrap(err, "failed to decode hex string")
 	}
 
-	if err := rsa.VerifyPKCS1v15(pubKey, crypto.SHA256, d, signature); err != nil {
-		return errors.Wrap(err, "failed to verify signature")
+	switch algorithms[req.Data.DocumentSOD.Algorithm] {
+	case SHA256withRSA:
+		pubKey := cert.PublicKey.(*rsa.PublicKey)
+
+		h := sha256.New()
+		h.Write(messageBytes)
+		d := h.Sum(nil)
+
+		if err := rsa.VerifyPKCS1v15(pubKey, crypto.SHA256, d, signature); err != nil {
+			return errors.Wrap(err, "failed to verify SHA256 with RSA signature")
+		}
+	case SHA1withECDSA:
+		pubKey := cert.PublicKey.(*ecdsa.PublicKey)
+
+		h := sha1.New()
+		h.Write(messageBytes)
+		d := h.Sum(nil)
+
+		if !ecdsa.VerifyASN1(pubKey, d, signature) {
+			return errors.New("failed to verify SHA1 with ECDSA signature")
+		}
+	case SHA256withECDSA:
+		pubKey := cert.PublicKey.(*ecdsa.PublicKey)
+
+		h := sha256.New()
+		h.Write(messageBytes)
+		d := h.Sum(nil)
+
+		if !ecdsa.VerifyASN1(pubKey, d, signature) {
+			return errors.New("failed to verify SHA256 with ECDSA signature")
+		}
+	default:
+		return errors.New(fmt.Sprintf("%s is unsupported algorithm", req.Data.DocumentSOD.Algorithm))
 	}
 
 	return nil
@@ -187,8 +257,10 @@ func validateCert(certPem []byte, masterCertsPem []byte) error {
 	return nil
 }
 
-func validatePubSignals(cfg *config.VerifierConfig, requestData requests.CreateIdentityRequestData) error {
-	if err := validatePubSignalsDG1Hash(requestData.DocumentSOD.EncapsulatedContent, requestData.ZKProof.PubSignals); err != nil {
+func validatePubSignals(
+	cfg *config.VerifierConfig, requestData requests.CreateIdentityRequestData, dg1 []byte,
+) error {
+	if err := validatePubSignalsDG1Hash(dg1, requestData.ZKProof.PubSignals); err != nil {
 		return errors.Wrap(err, "failed to validate DG1 hash")
 	}
 
@@ -203,18 +275,7 @@ func validatePubSignals(cfg *config.VerifierConfig, requestData requests.CreateI
 	return nil
 }
 
-func validatePubSignalsDG1Hash(encapsulatedContent string, pubSignals []string) error {
-	encapsulatedContentBytes, err := hex.DecodeString(encapsulatedContent)
-	if err != nil {
-		return errors.Wrap(err, "failed to decode hex string")
-	}
-
-	encapsulatedData := resources.EncapsulatedData{}
-	_, err = asn1.Unmarshal(encapsulatedContentBytes, &encapsulatedData)
-	if err != nil {
-		return errors.Wrap(err, "failed to unmarshal ASN.1")
-	}
-
+func validatePubSignalsDG1Hash(dg1 []byte, pubSignals []string) error {
 	ints, err := stringsToArrayBigInt([]string{pubSignals[0], pubSignals[1]})
 	if err != nil {
 		return errors.Wrap(err, "failed to convert strings to big integers")
@@ -224,7 +285,7 @@ func validatePubSignalsDG1Hash(encapsulatedContent string, pubSignals []string) 
 	hashBytes = append(hashBytes, ints[0].Bytes()...)
 	hashBytes = append(hashBytes, ints[1].Bytes()...)
 
-	if !bytes.Equal(encapsulatedData.PrivateKey.El1.OctetStr.Bytes, hashBytes) {
+	if !bytes.Equal(dg1, hashBytes) {
 		return errors.New("encapsulated data and proof pub signals hashes are different")
 	}
 
