@@ -4,7 +4,6 @@ go 1.21.6
 
 require (
 	github.com/Masterminds/squirrel v1.4.0
-	github.com/RarimoVoting/certificate-transparency-go v0.0.0-20240213140612-f9def7f4f8f5
 	github.com/alecthomas/kingpin v2.2.6+incompatible
 	github.com/fatih/structs v1.1.0
 	github.com/go-chi/chi v4.1.2+incompatible
@@ -12,6 +11,7 @@ require (
 	github.com/iden3/go-rapidsnark/types v0.0.3
 	github.com/iden3/go-rapidsnark/verifier v0.0.5
 	github.com/imroc/req/v3 v3.42.3
+	github.com/rarimo/certificate-transparency-go v0.0.0-20240213155651-cc6feffbd155
 	github.com/rubenv/sql-migrate v1.6.1
 	gitlab.com/distributed_lab/ape v1.7.1
 	gitlab.com/distributed_lab/figure v2.1.0+incompatible

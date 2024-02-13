@@ -18,12 +18,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/RarimoVoting/certificate-transparency-go/x509"
 	"github.com/RarimoVoting/identity-provider-service/internal/config"
 	"github.com/RarimoVoting/identity-provider-service/internal/data"
 	"github.com/RarimoVoting/identity-provider-service/internal/service/api/requests"
 	"github.com/RarimoVoting/identity-provider-service/resources"
 	"github.com/iden3/go-rapidsnark/verifier"
+	"github.com/rarimo/certificate-transparency-go/x509"
 	"gitlab.com/distributed_lab/ape"
 	"gitlab.com/distributed_lab/ape/problems"
 	"gitlab.com/distributed_lab/logan/v3/errors"
