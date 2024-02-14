@@ -1,10 +1,10 @@
 package service
 
 import (
-	"github.com/RarimoVoting/identity-provider-service/internal/data/pg"
-	"github.com/RarimoVoting/identity-provider-service/internal/service/api/handlers"
-	"github.com/RarimoVoting/identity-provider-service/internal/service/issuer"
 	"github.com/go-chi/chi"
+	"github.com/rarimo/passport-identity-provider/internal/data/pg"
+	"github.com/rarimo/passport-identity-provider/internal/service/api/handlers"
+	"github.com/rarimo/passport-identity-provider/internal/service/issuer"
 	"gitlab.com/distributed_lab/ape"
 )
 

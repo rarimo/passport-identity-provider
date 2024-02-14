@@ -2,11 +2,11 @@ FROM golang:1.21.6-alpine as buildbase
 
 RUN apk add git build-base
 
-WORKDIR /go/src/github.com/RarimoVoting/identity-provider-service
+WORKDIR /go/src/github.com/rarimo/passport-identity-provider
 COPY vendor .
 COPY . .
 
-RUN GOOS=linux go build  -o /usr/local/bin/identity-provider-service /go/src/github.com/RarimoVoting/identity-provider-service
+RUN GOOS=linux go build  -o /usr/local/bin/identity-provider-service /go/src/github.com/rarimo/passport-identity-provider
 
 
 FROM alpine:3.9

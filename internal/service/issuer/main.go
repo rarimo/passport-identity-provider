@@ -4,9 +4,9 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/RarimoVoting/identity-provider-service/internal/config"
 	"github.com/iden3/go-iden3-crypto/poseidon"
 	"github.com/imroc/req/v3"
+	"github.com/rarimo/passport-identity-provider/internal/config"
 	"gitlab.com/distributed_lab/logan/v3"
 	"gitlab.com/distributed_lab/logan/v3/errors"
 )

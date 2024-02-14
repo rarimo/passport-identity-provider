@@ -4,10 +4,10 @@ project: 'backend'
 image: builder
 from: golang:1.21.6-alpine
 docker:
-  WORKDIR: /go/src/github.com/RarimoVoting/identity-provider-service
+  WORKDIR: /go/src/github.com/rarimo/passport-identity-provider
 git:
   - add: /
-    to: /go/src/github.com/RarimoVoting/identity-provider-service
+    to: /go/src/github.com/rarimo/passport-identity-provider
     stageDependencies:
       install:
         - go.mod
@@ -25,10 +25,10 @@ shell:
     - export CGO_ENABLED=1
     - export GO111MODULE=on
     - export GOOS=linux
-    - cd /go/src/github.com/RarimoVoting/identity-provider-service
+    - cd /go/src/github.com/rarimo/passport-identity-provider
     - go mod tidy
     - go mod vendor
-    - go build -o /usr/local/bin/identity-provider-service /go/src/github.com/RarimoVoting/identity-provider-service
+    - go build -o /usr/local/bin/identity-provider-service /go/src/github.com/rarimo/passport-identity-provider
 
 ---
 image: service

@@ -2,8 +2,8 @@ package pg
 
 import (
 	sq "github.com/Masterminds/squirrel"
-	"github.com/RarimoVoting/identity-provider-service/internal/data"
 	"github.com/fatih/structs"
+	"github.com/rarimo/passport-identity-provider/internal/data"
 	"gitlab.com/distributed_lab/kit/pgdb"
 )
 

@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"github.com/RarimoVoting/identity-provider-service/internal/cli"
+	"github.com/rarimo/passport-identity-provider/internal/cli"
 )
 
 func main() {

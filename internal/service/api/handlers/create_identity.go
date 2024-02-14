@@ -3,9 +3,10 @@ package handlers
 import (
 	"bytes"
 	"crypto"
+	"crypto/ecdsa"
 	"crypto/rsa"
+	"crypto/sha1"
 	"crypto/sha256"
-	"crypto/x509"
 	"encoding/asn1"
 	"encoding/hex"
 	"encoding/json"
@@ -17,15 +18,34 @@ import (
 	"strings"
 	"time"
 
-	"github.com/RarimoVoting/identity-provider-service/internal/config"
-	"github.com/RarimoVoting/identity-provider-service/internal/data"
-	"github.com/RarimoVoting/identity-provider-service/internal/service/api/requests"
-	"github.com/RarimoVoting/identity-provider-service/resources"
 	"github.com/iden3/go-rapidsnark/verifier"
+	"github.com/rarimo/certificate-transparency-go/x509"
+	"github.com/rarimo/passport-identity-provider/internal/config"
+	"github.com/rarimo/passport-identity-provider/internal/data"
+	"github.com/rarimo/passport-identity-provider/internal/service/api/requests"
+	"github.com/rarimo/passport-identity-provider/resources"
 	"gitlab.com/distributed_lab/ape"
 	"gitlab.com/distributed_lab/ape/problems"
 	"gitlab.com/distributed_lab/logan/v3/errors"
 )
+
+// Full list of the OpenSSL signature algorithms and hash-functions is provided here:
+// https://www.openssl.org/docs/man1.1.1/man3/SSL_CTX_set1_sigalgs_list.html
+
+const (
+	SHA256withRSA   = "SHA256withRSA"
+	SHA1withECDSA   = "SHA1withECDSA"
+	SHA256withECDSA = "SHA256withECDSA"
+)
+
+var algorithms = map[string]string{
+	"SHA256withRSA": SHA256withRSA,
+
+	"SHA1withECDSA":   SHA1withECDSA,
+	"ecdsa-with-SHA1": SHA1withECDSA,
+
+	"SHA256withECDSA": SHA256withECDSA,
+}
 
 func CreateIdentity(w http.ResponseWriter, r *http.Request) {
 	req, err := requests.NewCreateIdentityRequest(r)
@@ -36,8 +56,8 @@ func CreateIdentity(w http.ResponseWriter, r *http.Request) {
 
 	cfg := VerifierConfig(r)
 
-	if err := verifySHA256WithRSA(req); err != nil {
-		Log(r).WithError(err).Error("failed to verify SHA256 with RSA")
+	if err := verifySignature(req); err != nil {
+		Log(r).WithError(err).Error("failed to verify signature")
 		ape.RenderErr(w, problems.InternalError())
 		return
 	}
@@ -150,7 +170,7 @@ func writeProof(r *http.Request, req requests.CreateIdentityRequest) error {
 	return nil
 }
 
-func verifySHA256WithRSA(req requests.CreateIdentityRequest) error {
+func verifySignature(req requests.CreateIdentityRequest) error {
 	block, _ := pem.Decode([]byte(req.Data.DocumentSOD.PemFile))
 	if block == nil {
 		return fmt.Errorf("invalid certificate: invalid PEM")
@@ -161,24 +181,49 @@ func verifySHA256WithRSA(req requests.CreateIdentityRequest) error {
 		return fmt.Errorf("invalid certificate: %w", err)
 	}
 
-	pubKey := cert.PublicKey.(*rsa.PublicKey)
-
 	messageBytes, err := hex.DecodeString(req.Data.DocumentSOD.SignedAttributes)
 	if err != nil {
 		return errors.Wrap(err, "failed to decode hex string")
 	}
-
-	h := sha256.New()
-	h.Write(messageBytes)
-	d := h.Sum(nil)
 
 	signature, err := hex.DecodeString(req.Data.DocumentSOD.Signature)
 	if err != nil {
 		return errors.Wrap(err, "failed to decode hex string")
 	}
 
-	if err := rsa.VerifyPKCS1v15(pubKey, crypto.SHA256, d, signature); err != nil {
-		return errors.Wrap(err, "failed to verify signature")
+	switch algorithms[req.Data.DocumentSOD.Algorithm] {
+	case SHA256withRSA:
+		pubKey := cert.PublicKey.(*rsa.PublicKey)
+
+		h := sha256.New()
+		h.Write(messageBytes)
+		d := h.Sum(nil)
+
+		if err := rsa.VerifyPKCS1v15(pubKey, crypto.SHA256, d, signature); err != nil {
+			return errors.Wrap(err, "failed to verify SHA256 with RSA signature")
+		}
+	case SHA1withECDSA:
+		pubKey := cert.PublicKey.(*ecdsa.PublicKey)
+
+		h := sha1.New()
+		h.Write(messageBytes)
+		d := h.Sum(nil)
+
+		if !ecdsa.VerifyASN1(pubKey, d, signature) {
+			return errors.New("failed to verify SHA1 with ECDSA signature")
+		}
+	case SHA256withECDSA:
+		pubKey := cert.PublicKey.(*ecdsa.PublicKey)
+
+		h := sha256.New()
+		h.Write(messageBytes)
+		d := h.Sum(nil)
+
+		if !ecdsa.VerifyASN1(pubKey, d, signature) {
+			return errors.New("failed to verify SHA256 with ECDSA signature")
+		}
+	default:
+		return errors.New(fmt.Sprintf("%s is unsupported algorithm", req.Data.DocumentSOD.Algorithm))
 	}
 
 	return nil
