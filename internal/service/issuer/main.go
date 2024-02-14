@@ -34,12 +34,22 @@ func (is *Issuer) DID() string {
 	return is.did
 }
 
-func (is *Issuer) IssueClaim(
-	id string, issuingAuthority int64, isAdult bool, expiration *time.Time, dg2 []byte,
+func (is *Issuer) IssueVotingClaim(
+	id string, issuingAuthority int64, isAdult bool, expiration *time.Time, dg2 []byte, salt *big.Int,
 ) (string, error) {
 	var result UUIDResponse
 
-	nullifierHash, err := poseidon.HashBytes(dg2)
+	nullifierHashInput := make([]*big.Int, 0)
+	if len(dg2) >= 32 {
+		// break data in a half
+		nullifierHashInput = append(nullifierHashInput, new(big.Int).SetBytes(dg2[:len(dg2)/2]))
+		nullifierHashInput = append(nullifierHashInput, new(big.Int).SetBytes(dg2[len(dg2)/2:]))
+	} else {
+		nullifierHashInput = append(nullifierHashInput, new(big.Int).SetBytes(dg2))
+	}
+	nullifierHashInput = append(nullifierHashInput, salt)
+
+	nullifierHash, err := poseidon.Hash(nullifierHashInput)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to hash bytes")
 	}
