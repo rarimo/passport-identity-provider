@@ -1,7 +1,9 @@
 package issuer
 
 import (
+	"github.com/google/uuid"
 	"math/big"
+	"strconv"
 	"time"
 
 	"github.com/iden3/go-iden3-crypto/poseidon"
@@ -15,6 +17,7 @@ type Issuer struct {
 	log    *logan.Entry
 	client *req.Client
 	cfg    *config.IssuerConfig
+	did    string
 }
 
 func New(log *logan.Entry, config *config.IssuerConfig) *Issuer {
@@ -23,7 +26,12 @@ func New(log *logan.Entry, config *config.IssuerConfig) *Issuer {
 			SetBaseURL(config.BaseUrl).
 			SetLogger(log),
 		cfg: config,
+		did: config.DID,
 	}
+}
+
+func (is *Issuer) DID() string {
+	return is.did
 }
 
 func (is *Issuer) IssueClaim(
@@ -75,4 +83,39 @@ func (is *Issuer) IssueClaim(
 	}
 
 	return result.Id, nil
+}
+
+func (is *Issuer) GetCredential(claimID uuid.UUID) (GetCredentialResponse, error) {
+	var cred GetCredentialResponse
+
+	response, err := is.client.R().
+		SetBasicAuth(is.cfg.AuthUsername, is.cfg.AuthPassword).
+		SetSuccessResult(&cred).
+		SetPathParam("id", claimID.String()).
+		Get("/credentials/{id}")
+	if err != nil {
+		return GetCredentialResponse{}, errors.Wrap(err, "failed to send post request")
+	}
+
+	if response.StatusCode >= 299 {
+		return GetCredentialResponse{}, errors.Wrap(ErrUnexpectedStatusCode, response.String())
+	}
+
+	return cred, nil
+}
+
+func (is *Issuer) RevokeClaim(revocationNonce int64) error {
+	response, err := is.client.R().
+		SetBasicAuth(is.cfg.AuthUsername, is.cfg.AuthPassword).
+		SetPathParam("nonce", strconv.FormatInt(revocationNonce, 10)).
+		Post("/credentials/revoke/{nonce}")
+	if err != nil {
+		return errors.Wrap(err, "failed to send post request")
+	}
+
+	if response.StatusCode >= 299 {
+		return errors.Wrap(ErrUnexpectedStatusCode, response.String())
+	}
+
+	return nil
 }

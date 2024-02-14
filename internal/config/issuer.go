@@ -14,6 +14,7 @@ type IssuerConfig struct {
 	BaseUrl          string `fig:"base_url,required"`
 	AuthUsername     string `fig:"auth_username,required"`
 	AuthPassword     string `fig:"auth_password,required"`
+	DID              string `fig:"did,required"`
 	ClaimType        string `fig:"claim_type,required"`
 	CredentialSchema string `fig:"credential_schema,required"`
 }

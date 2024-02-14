@@ -18,11 +18,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/iden3/go-rapidsnark/verifier"
 	"github.com/rarimo/certificate-transparency-go/x509"
 	"github.com/rarimo/passport-identity-provider/internal/config"
 	"github.com/rarimo/passport-identity-provider/internal/data"
 	"github.com/rarimo/passport-identity-provider/internal/service/api/requests"
+	"github.com/rarimo/passport-identity-provider/internal/service/issuer"
 	"github.com/rarimo/passport-identity-provider/resources"
 	"gitlab.com/distributed_lab/ape"
 	"gitlab.com/distributed_lab/ape/problems"
@@ -54,87 +56,130 @@ func CreateIdentity(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cfg := VerifierConfig(r)
-
-	if err := verifySignature(req); err != nil {
-		Log(r).WithError(err).Error("failed to verify signature")
-		ape.RenderErr(w, problems.InternalError())
-		return
-	}
-
-	if err := verifier.VerifyGroth16(req.Data.ZKProof, cfg.VerificationKey); err != nil {
-		Log(r).WithError(err).Debug("failed to verify Groth16")
-		ape.RenderErr(w, problems.BadRequest(err)...)
-		return
-	}
-
-	encapsulatedContentBytes, err := hex.DecodeString(req.Data.DocumentSOD.EncapsulatedContent)
-	if err != nil {
-		Log(r).WithError(err).Error("failed to decode hex string")
-		ape.RenderErr(w, problems.InternalError())
-		return
-	}
-
-	encapsulatedData := resources.EncapsulatedData{}
-	_, err = asn1.Unmarshal(encapsulatedContentBytes, &encapsulatedData)
-	if err != nil {
-		Log(r).WithError(err).Error("failed to unmarshal ASN.1")
-		ape.RenderErr(w, problems.InternalError())
-		return
-	}
-
-	if err := validatePubSignals(cfg, req.Data, encapsulatedData.PrivateKey.El1.OctetStr.Bytes); err != nil {
-		Log(r).WithError(err).Debug("failed to validate pub signals")
-		ape.RenderErr(w, problems.BadRequest(err)...)
-		return
-	}
-
-	if err := validateCert([]byte(req.Data.DocumentSOD.PemFile), cfg.MasterCerts); err != nil {
-		Log(r).WithError(err).Error("failed to validate certificate")
-		ape.RenderErr(w, problems.BadRequest(err)...)
-		return
-	}
-
+	var claimID string
 	iss := Issuer(r)
+	masterQ := MasterQ(r)
 
-	identityExpiration, err := getExpirationTimeFromPubSignals(req.Data.ZKProof.PubSignals)
+	claim, err := masterQ.Claim().ResetFilter().FilterBy("user_did", req.Data.ID).Get()
 	if err != nil {
-		Log(r).WithError(err).Error("failed to get expiration time")
-		ape.RenderErr(w, problems.BadRequest(err)...)
-		return
-	}
-
-	issuingAuthority, err := strconv.Atoi(req.Data.ZKProof.PubSignals[2])
-	if err != nil {
-		Log(r).WithError(err).Error("failed to convert string to int")
+		Log(r).WithError(err).Error("failed to get claim by user DID")
 		ape.RenderErr(w, problems.InternalError())
 		return
 	}
 
-	id, err := iss.IssueClaim(
-		req.Data.ID, int64(issuingAuthority), true, identityExpiration,
-		encapsulatedData.PrivateKey.El2.OctetStr.Bytes,
-	)
-	if err != nil {
-		Log(r).WithError(err).Error("failed to issue voting claim")
-		ape.RenderErr(w, problems.InternalError())
+	if claim != nil {
+		response := resources.ClaimResponse{
+			Data: resources.Claim{
+				Key: resources.Key{
+					ID:   claim.ID.String(),
+					Type: resources.CLAIMS,
+				},
+				Attributes: resources.ClaimAttributes{
+					ClaimId:   claim.ID.String(),
+					IssuerDid: claim.IssuerDID,
+				},
+			},
+		}
+		ape.Render(w, response)
 		return
 	}
 
-	if err := writeProof(r, req); err != nil {
-		Log(r).WithError(err).Error("failed to write proof to the database")
-		ape.RenderErr(w, problems.InternalError())
+	if err := masterQ.Transaction(func(db data.MasterQ) error {
+		// check if there is a claim for this document already
+		claim, err := db.Claim().ResetFilter().
+			FilterBy("document", req.Data.DocumentSOD.SignedAttributes).
+			ForUpdate().
+			Get()
+		if err != nil {
+			ape.RenderErr(w, problems.InternalError())
+			return errors.Wrap(err, "failed to get claim")
+		}
+
+		// revoke if so
+		if claim != nil {
+			if err := revokeOutdatedClaim(db, iss, claim.ID); err != nil {
+				ape.RenderErr(w, problems.InternalError())
+				return errors.Wrap(err, "failed to revoke outdated claim")
+			}
+		}
+
+		cfg := VerifierConfig(r)
+
+		if err := verifySignature(req); err != nil {
+			ape.RenderErr(w, problems.InternalError())
+			return errors.Wrap(err, "failed to verify signature")
+		}
+
+		if err := verifier.VerifyGroth16(req.Data.ZKProof, cfg.VerificationKey); err != nil {
+			ape.RenderErr(w, problems.BadRequest(err)...)
+			return errors.Wrap(err, "failed to verify Groth16")
+		}
+
+		encapsulatedContentBytes, err := hex.DecodeString(req.Data.DocumentSOD.EncapsulatedContent)
+		if err != nil {
+			ape.RenderErr(w, problems.InternalError())
+			return errors.Wrap(err, "failed to decode hex string")
+		}
+
+		encapsulatedData := resources.EncapsulatedData{}
+		_, err = asn1.Unmarshal(encapsulatedContentBytes, &encapsulatedData)
+		if err != nil {
+			ape.RenderErr(w, problems.InternalError())
+			return errors.Wrap(err, "failed to unmarshal ASN.1")
+		}
+
+		if err := validatePubSignals(cfg, req.Data, encapsulatedData.PrivateKey.El1.OctetStr.Bytes); err != nil {
+			ape.RenderErr(w, problems.BadRequest(err)...)
+			return errors.Wrap(err, "failed to validate pub signals")
+		}
+
+		if err := validateCert([]byte(req.Data.DocumentSOD.PemFile), cfg.MasterCerts); err != nil {
+			ape.RenderErr(w, problems.BadRequest(err)...)
+			return errors.Wrap(err, "failed to validate certificate")
+		}
+
+		identityExpiration, err := getExpirationTimeFromPubSignals(req.Data.ZKProof.PubSignals)
+		if err != nil {
+			ape.RenderErr(w, problems.BadRequest(err)...)
+			return errors.Wrap(err, "failed to get expiration time")
+		}
+
+		issuingAuthority, err := strconv.Atoi(req.Data.ZKProof.PubSignals[2])
+		if err != nil {
+			ape.RenderErr(w, problems.InternalError())
+			return errors.Wrap(err, "failed to convert string to int")
+		}
+
+		claimID, err = iss.IssueClaim(
+			req.Data.ID, int64(issuingAuthority), true, identityExpiration,
+			encapsulatedData.PrivateKey.El2.OctetStr.Bytes,
+		)
+		if err != nil {
+			ape.RenderErr(w, problems.InternalError())
+			return errors.Wrap(err, "failed to issue voting claim")
+		}
+
+		if err := writeDataToDB(db, req, claimID); err != nil {
+			ape.RenderErr(w, problems.InternalError())
+			return errors.Wrap(err, "failed to write proof to the database")
+		}
+
+		return nil
+	}); err != nil {
+		Log(r).WithError(err).Error("failed to execute SQL transaction")
+		// error was rendered beforehand
 		return
 	}
 
 	response := resources.ClaimResponse{
 		Data: resources.Claim{
 			Key: resources.Key{
-				ID:   id,
+				ID:   claimID,
 				Type: resources.CLAIMS,
 			},
 			Attributes: resources.ClaimAttributes{
-				ClaimId: id,
+				ClaimId:   claimID,
+				IssuerDid: iss.DID(),
 			},
 		},
 	}
@@ -142,7 +187,26 @@ func CreateIdentity(w http.ResponseWriter, r *http.Request) {
 	ape.Render(w, response)
 }
 
-func writeProof(r *http.Request, req requests.CreateIdentityRequest) error {
+func revokeOutdatedClaim(db data.MasterQ, iss *issuer.Issuer, claimID uuid.UUID) error {
+	cred, err := iss.GetCredential(claimID)
+	if err != nil {
+		return errors.Wrap(err, "failed to get credential")
+	}
+
+	if !cred.Revoked {
+		if err := iss.RevokeClaim(cred.RevNonce); err != nil {
+			return errors.Wrap(err, "failed to revoke claim")
+		}
+	}
+
+	if err := db.Claim().DeleteByID(claimID); err != nil {
+		return errors.Wrap(err, "failed to delete claim")
+	}
+
+	return nil
+}
+
+func writeDataToDB(db data.MasterQ, req requests.CreateIdentityRequest, claimIDStr string) error {
 	proofData, err := json.Marshal(req.Data.ZKProof.Proof)
 	if err != nil {
 		return errors.Wrap(err, "failed to marshal JSON")
@@ -158,13 +222,27 @@ func writeProof(r *http.Request, req requests.CreateIdentityRequest) error {
 		return errors.Wrap(err, "failed to marshal JSON")
 	}
 
-	if err := ProofsQ(r).New().Insert(data.Proof{
+	claimID, err := uuid.Parse(claimIDStr)
+	if err != nil {
+		return errors.Wrap(err, "failed to parse uuid")
+	}
+
+	if err := db.Proof().Insert(data.Proof{
 		DID:         req.Data.ID,
+		ClaimID:     claimID,
 		Data:        proofData,
 		PubSignals:  pubSignals,
 		DocumentSOD: DocumentSOD,
 	}); err != nil {
 		return errors.Wrap(err, "failed to insert proof in the database")
+	}
+
+	if err := db.Claim().Insert(data.Claim{
+		ID:       claimID,
+		UserDID:  req.Data.ID,
+		Document: req.Data.DocumentSOD.SignedAttributes,
+	}); err != nil {
+		return errors.Wrap(err, "failed to insert claim in the database")
 	}
 
 	return nil

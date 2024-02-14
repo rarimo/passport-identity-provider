@@ -16,12 +16,14 @@ func (s *service) router() chi.Router {
 		ape.LoganMiddleware(s.log),
 		ape.CtxMiddleware(
 			handlers.CtxLog(s.log),
+			handlers.CtxMasterQ(pg.NewMasterQ(s.cfg.DB())),
 			handlers.CtxVerifierConfig(s.cfg.VerifierConfig()),
+			handlers.CtxProofsQ(pg.NewProofsQ(s.cfg.DB())),
+			handlers.CtxClaimsQ(pg.NewClaimsQ(s.cfg.DB())),
 			handlers.CtxIssuer(issuer.New(
 				s.cfg.Log().WithField("service", "issuer"),
 				s.cfg.IssuerConfig(),
 			)),
-			handlers.CtxProofsQ(pg.NewProofsQ(s.cfg.DB())),
 		),
 	)
 	r.Route("/integrations/identity-provider-service", func(r chi.Router) {
