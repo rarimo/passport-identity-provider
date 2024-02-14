@@ -43,3 +43,11 @@ import:
     add: /usr/local/bin/identity-provider-service
     to: /usr/local/bin/identity-provider-service
     after: setup
+  - image: builder
+    add: /go/src/github.com/rarimo/passport-identity-provider/verification_key.json
+    to: /verification_key.json
+    after: setup
+  - image: builder
+    add: /go/src/github.com/rarimo/passport-identity-provider/masterList.dev.pem
+    to: /masterList.dev.pem
+    after: setup
