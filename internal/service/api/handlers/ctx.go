@@ -13,9 +13,11 @@ type ctxKey int
 
 const (
 	logCtxKey ctxKey = iota
+	masterQKey
 	verifierConfigKey
 	issuerCtxKey
 	proofsQKey
+	claimsQKey
 )
 
 func CtxLog(entry *logan.Entry) func(context.Context) context.Context {
@@ -26,6 +28,16 @@ func CtxLog(entry *logan.Entry) func(context.Context) context.Context {
 
 func Log(r *http.Request) *logan.Entry {
 	return r.Context().Value(logCtxKey).(*logan.Entry)
+}
+
+func CtxMasterQ(entry data.MasterQ) func(context.Context) context.Context {
+	return func(ctx context.Context) context.Context {
+		return context.WithValue(ctx, masterQKey, entry)
+	}
+}
+
+func MasterQ(r *http.Request) data.MasterQ {
+	return r.Context().Value(masterQKey).(data.MasterQ).New()
 }
 
 func CtxVerifierConfig(entry *config.VerifierConfig) func(context.Context) context.Context {
@@ -56,4 +68,14 @@ func CtxProofsQ(entry data.ProofQ) func(context.Context) context.Context {
 
 func ProofsQ(r *http.Request) data.ProofQ {
 	return r.Context().Value(proofsQKey).(data.ProofQ).New()
+}
+
+func CtxClaimsQ(entry data.ClaimQ) func(context.Context) context.Context {
+	return func(ctx context.Context) context.Context {
+		return context.WithValue(ctx, claimsQKey, entry)
+	}
+}
+
+func ClaimsQ(r *http.Request) data.ClaimQ {
+	return r.Context().Value(claimsQKey).(data.ClaimQ).New()
 }

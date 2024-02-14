@@ -8,6 +8,9 @@ allOf:
         type: object
         required:
           - claim_id
+          - issuer_did
         properties:
           claim_id:
+            type: string
+          issuer_did:
             type: string

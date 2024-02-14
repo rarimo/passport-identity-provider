@@ -5,6 +5,7 @@ verifier:
 
 issuer:
   base_url: "http://localhost:3002/v1"
+  did: ""
   auth_username: ""
   auth_password: ""
   claim_type: "VotingCredential"
