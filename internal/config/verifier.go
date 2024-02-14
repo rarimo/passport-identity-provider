@@ -4,6 +4,8 @@ import (
 	"gitlab.com/distributed_lab/figure/v3"
 	"gitlab.com/distributed_lab/kit/comfig"
 	"gitlab.com/distributed_lab/kit/kv"
+	"gitlab.com/distributed_lab/logan/v3/errors"
+	"math/big"
 	"os"
 )
 
@@ -15,6 +17,7 @@ type VerifierConfig struct {
 	VerificationKey []byte
 	MasterCerts     []byte
 	AllowedAge      int
+	Blinder         *big.Int
 }
 
 type verifier struct {
@@ -34,6 +37,7 @@ func (v *verifier) VerifierConfig() *VerifierConfig {
 			VerificationKeyPath string `fig:"verification_key_path,required"`
 			MasterCertsPath     string `fig:"master_certs_path,required"`
 			AllowedAge          int    `fig:"allowed_age,required"`
+			Blinder             string `fig:"blinder,required"`
 		}{}
 
 		err := figure.
@@ -54,10 +58,16 @@ func (v *verifier) VerifierConfig() *VerifierConfig {
 			panic(err)
 		}
 
+		blinder, ok := new(big.Int).SetString(newCfg.Blinder, 10)
+		if !ok {
+			panic(errors.New("failed to set blinder string to big.Int"))
+		}
+
 		return &VerifierConfig{
 			VerificationKey: verificationKey,
 			MasterCerts:     masterCerts,
 			AllowedAge:      newCfg.AllowedAge,
+			Blinder:         blinder,
 		}
 	}).(*VerifierConfig)
 }

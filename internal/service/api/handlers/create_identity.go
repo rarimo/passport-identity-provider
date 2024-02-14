@@ -150,9 +150,9 @@ func CreateIdentity(w http.ResponseWriter, r *http.Request) {
 			return errors.Wrap(err, "failed to convert string to int")
 		}
 
-		claimID, err = iss.IssueClaim(
+		claimID, err = iss.IssueVotingClaim(
 			req.Data.ID, int64(issuingAuthority), true, identityExpiration,
-			encapsulatedData.PrivateKey.El2.OctetStr.Bytes,
+			encapsulatedData.PrivateKey.El2.OctetStr.Bytes, cfg.Blinder,
 		)
 		if err != nil {
 			ape.RenderErr(w, problems.InternalError())

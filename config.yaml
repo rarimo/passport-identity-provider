@@ -2,6 +2,7 @@ verifier:
   verification_key_path: "./verification_key.json"
   master_certs_path: "./masterList.dev.pem"
   allowed_age: 18
+  blinder: 1 # big value required
 
 issuer:
   base_url: "http://localhost:3002/v1"
