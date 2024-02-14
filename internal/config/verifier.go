@@ -60,7 +60,7 @@ func (v *verifier) VerifierConfig() *VerifierConfig {
 
 		blinder, ok := new(big.Int).SetString(newCfg.Blinder, 10)
 		if !ok {
-			panic(errors.New("failed to set salt string to big.Int"))
+			panic(errors.New("failed to set blinder string to big.Int"))
 		}
 
 		return &VerifierConfig{

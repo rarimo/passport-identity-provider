@@ -35,7 +35,7 @@ func (is *Issuer) DID() string {
 }
 
 func (is *Issuer) IssueVotingClaim(
-	id string, issuingAuthority int64, isAdult bool, expiration *time.Time, dg2 []byte, salt *big.Int,
+	id string, issuingAuthority int64, isAdult bool, expiration *time.Time, dg2 []byte, blinder *big.Int,
 ) (string, error) {
 	var result UUIDResponse
 
@@ -47,7 +47,7 @@ func (is *Issuer) IssueVotingClaim(
 	} else {
 		nullifierHashInput = append(nullifierHashInput, new(big.Int).SetBytes(dg2))
 	}
-	nullifierHashInput = append(nullifierHashInput, salt)
+	nullifierHashInput = append(nullifierHashInput, blinder)
 
 	nullifierHash, err := poseidon.Hash(nullifierHashInput)
 	if err != nil {
