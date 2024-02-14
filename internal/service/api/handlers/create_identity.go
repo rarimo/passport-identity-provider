@@ -128,10 +128,10 @@ func CreateIdentity(w http.ResponseWriter, r *http.Request) {
 			return errors.Wrap(err, "failed to unmarshal ASN.1")
 		}
 
-		//if err := validatePubSignals(cfg, req.Data, encapsulatedData.PrivateKey.El1.OctetStr.Bytes); err != nil {
-		//	ape.RenderErr(w, problems.BadRequest(err)...)
-		//	return errors.Wrap(err, "failed to validate pub signals")
-		//}
+		if err := validatePubSignals(cfg, req.Data, encapsulatedData.PrivateKey.El1.OctetStr.Bytes); err != nil {
+			ape.RenderErr(w, problems.BadRequest(err)...)
+			return errors.Wrap(err, "failed to validate pub signals")
+		}
 
 		if err := validateCert([]byte(req.Data.DocumentSOD.PemFile), cfg.MasterCerts); err != nil {
 			ape.RenderErr(w, problems.BadRequest(err)...)

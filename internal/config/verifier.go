@@ -58,7 +58,7 @@ func (v *verifier) VerifierConfig() *VerifierConfig {
 			panic(err)
 		}
 
-		salt, ok := new(big.Int).SetString(newCfg.Blinder, 10)
+		blinder, ok := new(big.Int).SetString(newCfg.Blinder, 10)
 		if !ok {
 			panic(errors.New("failed to set salt string to big.Int"))
 		}
@@ -67,7 +67,7 @@ func (v *verifier) VerifierConfig() *VerifierConfig {
 			VerificationKey: verificationKey,
 			MasterCerts:     masterCerts,
 			AllowedAge:      newCfg.AllowedAge,
-			Blinder:         salt,
+			Blinder:         blinder,
 		}
 	}).(*VerifierConfig)
 }
