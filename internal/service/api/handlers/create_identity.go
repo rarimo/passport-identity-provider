@@ -85,24 +85,6 @@ func CreateIdentity(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := masterQ.Transaction(func(db data.MasterQ) error {
-		// check if there is a claim for this document already
-		claim, err := db.Claim().ResetFilter().
-			FilterBy("document", req.Data.DocumentSOD.SignedAttributes).
-			ForUpdate().
-			Get()
-		if err != nil {
-			ape.RenderErr(w, problems.InternalError())
-			return errors.Wrap(err, "failed to get claim")
-		}
-
-		// revoke if so
-		if claim != nil {
-			if err := revokeOutdatedClaim(db, iss, claim.ID); err != nil {
-				ape.RenderErr(w, problems.InternalError())
-				return errors.Wrap(err, "failed to revoke outdated claim")
-			}
-		}
-
 		cfg := VerifierConfig(r)
 
 		if err := verifySignature(req); err != nil {
@@ -150,6 +132,24 @@ func CreateIdentity(w http.ResponseWriter, r *http.Request) {
 			return errors.Wrap(err, "failed to convert string to int")
 		}
 
+		// check if there is a claim for this document already
+		claim, err := db.Claim().ResetFilter().
+			FilterBy("document", req.Data.DocumentSOD.SignedAttributes).
+			ForUpdate().
+			Get()
+		if err != nil {
+			ape.RenderErr(w, problems.InternalError())
+			return errors.Wrap(err, "failed to get claim")
+		}
+
+		// revoke if so
+		if claim != nil {
+			if err := revokeOutdatedClaim(db, iss, claim.ID); err != nil {
+				ape.RenderErr(w, problems.InternalError())
+				return errors.Wrap(err, "failed to revoke outdated claim")
+			}
+		}
+
 		claimID, err = iss.IssueVotingClaim(
 			req.Data.ID, int64(issuingAuthority), true, identityExpiration,
 			encapsulatedData.PrivateKey.El2.OctetStr.Bytes, cfg.Blinder,
@@ -159,7 +159,7 @@ func CreateIdentity(w http.ResponseWriter, r *http.Request) {
 			return errors.Wrap(err, "failed to issue voting claim")
 		}
 
-		if err := writeDataToDB(db, req, claimID); err != nil {
+		if err := writeDataToDB(db, req, claimID, iss.DID()); err != nil {
 			ape.RenderErr(w, problems.InternalError())
 			return errors.Wrap(err, "failed to write proof to the database")
 		}
@@ -206,7 +206,7 @@ func revokeOutdatedClaim(db data.MasterQ, iss *issuer.Issuer, claimID uuid.UUID)
 	return nil
 }
 
-func writeDataToDB(db data.MasterQ, req requests.CreateIdentityRequest, claimIDStr string) error {
+func writeDataToDB(db data.MasterQ, req requests.CreateIdentityRequest, claimIDStr, issuerDID string) error {
 	proofData, err := json.Marshal(req.Data.ZKProof.Proof)
 	if err != nil {
 		return errors.Wrap(err, "failed to marshal JSON")
@@ -238,9 +238,10 @@ func writeDataToDB(db data.MasterQ, req requests.CreateIdentityRequest, claimIDS
 	}
 
 	if err := db.Claim().Insert(data.Claim{
-		ID:       claimID,
-		UserDID:  req.Data.ID,
-		Document: req.Data.DocumentSOD.SignedAttributes,
+		ID:        claimID,
+		UserDID:   req.Data.ID,
+		IssuerDID: issuerDID,
+		Document:  req.Data.DocumentSOD.SignedAttributes,
 	}); err != nil {
 		return errors.Wrap(err, "failed to insert claim in the database")
 	}
