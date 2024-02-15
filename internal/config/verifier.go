@@ -14,10 +14,10 @@ type VerifierConfiger interface {
 }
 
 type VerifierConfig struct {
-	VerificationKey []byte
-	MasterCerts     []byte
-	AllowedAge      int
-	Blinder         *big.Int
+	VerificationKeys map[string][]byte
+	MasterCerts      []byte
+	AllowedAge       int
+	Blinder          *big.Int
 }
 
 type verifier struct {
@@ -34,10 +34,10 @@ func NewVerifierConfiger(getter kv.Getter) VerifierConfiger {
 func (v *verifier) VerifierConfig() *VerifierConfig {
 	return v.once.Do(func() interface{} {
 		newCfg := struct {
-			VerificationKeyPath string `fig:"verification_key_path,required"`
-			MasterCertsPath     string `fig:"master_certs_path,required"`
-			AllowedAge          int    `fig:"allowed_age,required"`
-			Blinder             string `fig:"blinder,required"`
+			VerificationKeysPaths map[string]string `fig:"verification_keys_paths,required"`
+			MasterCertsPath       string            `fig:"master_certs_path,required"`
+			AllowedAge            int               `fig:"allowed_age,required"`
+			Blinder               string            `fig:"blinder,required"`
 		}{}
 
 		err := figure.
@@ -48,9 +48,14 @@ func (v *verifier) VerifierConfig() *VerifierConfig {
 			panic(err)
 		}
 
-		verificationKey, err := os.ReadFile(newCfg.VerificationKeyPath)
-		if err != nil {
-			panic(err)
+		verificationKeys := make(map[string][]byte)
+		for algo, path := range newCfg.VerificationKeysPaths {
+			verificationKey, err := os.ReadFile(path)
+			if err != nil {
+				panic(err)
+			}
+
+			verificationKeys[algo] = verificationKey
 		}
 
 		masterCerts, err := os.ReadFile(newCfg.MasterCertsPath)
@@ -64,10 +69,10 @@ func (v *verifier) VerifierConfig() *VerifierConfig {
 		}
 
 		return &VerifierConfig{
-			VerificationKey: verificationKey,
-			MasterCerts:     masterCerts,
-			AllowedAge:      newCfg.AllowedAge,
-			Blinder:         blinder,
+			VerificationKeys: verificationKeys,
+			MasterCerts:      masterCerts,
+			AllowedAge:       newCfg.AllowedAge,
+			Blinder:          blinder,
 		}
 	}).(*VerifierConfig)
 }

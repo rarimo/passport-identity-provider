@@ -35,6 +35,9 @@ import (
 // https://www.openssl.org/docs/man1.1.1/man3/SSL_CTX_set1_sigalgs_list.html
 
 const (
+	SHA1   = "sha1"
+	SHA256 = "sha256"
+
 	SHA256withRSA   = "SHA256withRSA"
 	SHA1withECDSA   = "SHA1withECDSA"
 	SHA256withECDSA = "SHA256withECDSA"
@@ -92,9 +95,17 @@ func CreateIdentity(w http.ResponseWriter, r *http.Request) {
 			return errors.Wrap(err, "failed to verify signature")
 		}
 
-		if err := verifier.VerifyGroth16(req.Data.ZKProof, cfg.VerificationKey); err != nil {
-			ape.RenderErr(w, problems.BadRequest(err)...)
-			return errors.Wrap(err, "failed to verify Groth16")
+		switch algorithms[req.Data.DocumentSOD.Algorithm] {
+		case SHA1withECDSA:
+			if err := verifier.VerifyGroth16(req.Data.ZKProof, cfg.VerificationKeys[SHA1]); err != nil {
+				ape.RenderErr(w, problems.BadRequest(err)...)
+				return errors.Wrap(err, "failed to verify Groth16")
+			}
+		case SHA256withRSA, SHA256withECDSA:
+			if err := verifier.VerifyGroth16(req.Data.ZKProof, cfg.VerificationKeys[SHA256]); err != nil {
+				ape.RenderErr(w, problems.BadRequest(err)...)
+				return errors.Wrap(err, "failed to verify Groth16")
+			}
 		}
 
 		encapsulatedContentBytes, err := hex.DecodeString(req.Data.DocumentSOD.EncapsulatedContent)
