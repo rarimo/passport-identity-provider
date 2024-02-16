@@ -16,7 +16,7 @@ require (
 	github.com/iden3/go-rapidsnark/types v0.0.3
 	github.com/iden3/go-rapidsnark/verifier v0.0.5
 	github.com/imroc/req/v3 v3.42.3
-	github.com/rarimo/certificate-transparency-go v0.0.0-20240213155651-cc6feffbd155
+	github.com/rarimo/certificate-transparency-go v0.0.0-20240216144634-4291bc43f73b
 	github.com/rubenv/sql-migrate v1.6.1
 	gitlab.com/distributed_lab/ape v1.7.1
 	gitlab.com/distributed_lab/figure v2.1.0+incompatible

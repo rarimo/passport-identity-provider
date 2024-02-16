@@ -298,8 +298,8 @@ github.com/quic-go/qtls-go1-20 v0.4.1 h1:D33340mCNDAIKBqXuAvexTNMUByrYmFYVfKfDN5
 github.com/quic-go/qtls-go1-20 v0.4.1/go.mod h1:X9Nh97ZL80Z+bX/gUXMbipO6OxdiDi58b/fMC9mAL+k=
 github.com/quic-go/quic-go v0.40.1 h1:X3AGzUNFs0jVuO3esAGnTfvdgvL4fq655WaOi1snv1Q=
 github.com/quic-go/quic-go v0.40.1/go.mod h1:PeN7kuVJ4xZbxSv/4OX6S1USOX8MJvydwpTx31vx60c=
-github.com/rarimo/certificate-transparency-go v0.0.0-20240213155651-cc6feffbd155 h1:u0qSbEwV+pEQ2o89VUpZ0vuH6q73Aw5zQfQFe6tWEcM=
-github.com/rarimo/certificate-transparency-go v0.0.0-20240213155651-cc6feffbd155/go.mod h1:se3tnEsU7zjZcNv0U4iKbXapSY1mxg8gOKDNDLZizcw=
+github.com/rarimo/certificate-transparency-go v0.0.0-20240216144634-4291bc43f73b h1:np1WhYvz90AO1dCj0ZL+FLeC+JpNjGZqZooTeOluR6I=
+github.com/rarimo/certificate-transparency-go v0.0.0-20240216144634-4291bc43f73b/go.mod h1:se3tnEsU7zjZcNv0U4iKbXapSY1mxg8gOKDNDLZizcw=
 github.com/refraction-networking/utls v1.6.0 h1:X5vQMqVx7dY7ehxxqkFER/W6DSjy8TMqSItXm8hRDYQ=
 github.com/refraction-networking/utls v1.6.0/go.mod h1:kHJ6R9DFFA0WsRgBM35iiDku4O7AqPR6y79iuzW7b10=
 github.com/rivo/uniseg v0.4.4 h1:8TfxU8dW6PdqD27gjM8MVNuicgxIjxpm4K7x4jp8sis=
