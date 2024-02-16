@@ -1,0 +1,205 @@
+openapi: 3.0.0
+info:
+  version: 1.0.0
+  title: null
+  description: ''
+servers:
+  - url: 'https://api.demo.tokend.io'
+    description: TokenD Developer Environment
+paths:
+  /intergrations/identity-provider-service/v1/create-identity:
+    post:
+      tags:
+        - Identity
+      summary: The identity creating
+      operationId: create-identity
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - data
+              properties:
+                data:
+                  type: object
+                  required:
+                    - id
+                    - document_sod
+                    - zkproof
+                  properties:
+                    id:
+                      type: string
+                    document_sod:
+                      type: object
+                      required:
+                        - signed_attributes
+                        - algorithm
+                        - signature
+                        - pem_file
+                        - encapsulated_content
+                      properties:
+                        signed_attributes:
+                          type: string
+                        algorithm:
+                          type: string
+                        signature:
+                          type: string
+                        pem_file:
+                          type: string
+                        encapsulated_content:
+                          type: string
+                    zkproof:
+                      type: object
+                      required:
+                        - proof
+                        - pub_signals
+                      properties:
+                        proof:
+                          type: object
+                          required:
+                            - pi_a
+                            - pi_b
+                            - pi_c
+                            - protocol
+                            - curve
+                          properties:
+                            pi_a:
+                              type: array
+                              items:
+                                type: string
+                            pi_b:
+                              type: array
+                              items:
+                                type: array
+                                items:
+                                  type: string
+                            pi_c:
+                              type: array
+                              items:
+                                type: string
+                            protocol:
+                              type: string
+                            curve:
+                              type: string
+                        pub_signals:
+                          type: array
+                          items:
+                            type: string
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    $ref: '#/components/schemas/Claim'
+        '400':
+          description: Bad Request Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Errors'
+        '500':
+          description: Internal Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Errors'
+components:
+  schemas:
+    Claim:
+      allOf:
+        - $ref: '#/components/schemas/ClaimKey'
+        - type: object
+          required:
+            - attributes
+          properties:
+            attributes:
+              type: object
+              required:
+                - claim_id
+                - issuer_did
+              properties:
+                claim_id:
+                  type: string
+                issuer_did:
+                  type: string
+    ClaimKey:
+      type: object
+      required:
+        - id
+        - type
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum:
+            - claims
+    Errors:
+      description: 'Standard JSON:API error'
+      type: object
+      required:
+        - errors
+      properties:
+        errors:
+          type: array
+          description: Non empty array of errors occurred during request processing
+          items:
+            type: object
+            required:
+              - title
+              - status
+            properties:
+              title:
+                type: string
+                description: 'Title is a short, human-readable summary of the problem'
+                example: Bad Request
+              detail:
+                type: string
+                description: Detail is a human-readable explanation specific to this occurrence of the problem
+                example: Request body was expected
+              status:
+                type: integer
+                description: Status is the HTTP status code applicable to this problem
+                example: 400
+                enum:
+                  - 400
+                  - 401
+                  - 403
+                  - 404
+                  - 409
+                  - 500
+  parameters:
+    pageLimitParam:
+      in: query
+      name: 'page[limit]'
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 15
+        description: Numbers of items per page to return.
+    pageNumberParam:
+      in: query
+      name: 'page[number]'
+      required: false
+      schema:
+        type: integer
+      description: The number of a page to return.
+    sortingParam:
+      in: query
+      name: 'page[order]'
+      required: false
+      schema:
+        type: string
+        enum:
+          - asc
+          - desc
+        default: desc
+        description: 'Order of records on the page. If sortingParam is not specified, order of records is by default sorted by ID.'
