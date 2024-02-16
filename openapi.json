@@ -166,6 +166,63 @@
           }
         }
       }
+    },
+    "/intergrations/identity-provider-service/v1/gist-data": {
+      "get": {
+        "tags": [
+          "GIST"
+        ],
+        "summary": "The GIST data retrieving",
+        "operationId": "gist-data",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "user_did",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "$ref": "#/components/schemas/GistData"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Errors"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Errors"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -260,6 +317,93 @@
                 }
               }
             }
+          }
+        }
+      },
+      "GistData": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/GistDataKey"
+          },
+          {
+            "type": "object",
+            "required": [
+              "attributes"
+            ],
+            "properties": {
+              "attributes": {
+                "type": "object",
+                "required": [
+                  "gist_proof",
+                  "gist_root"
+                ],
+                "properties": {
+                  "gist_proof": {
+                    "$ref": "#/components/schemas/GistProof"
+                  },
+                  "gist_root": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "GistDataKey": {
+        "type": "object",
+        "required": [
+          "id",
+          "type"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "gist_datas"
+            ]
+          }
+        }
+      },
+      "GistProof": {
+        "type": "object",
+        "required": [
+          "root",
+          "existence",
+          "siblings",
+          "index",
+          "value",
+          "aux_existence",
+          "aux_index",
+          "aux_value"
+        ],
+        "properties": {
+          "root": {
+            "type": "string"
+          },
+          "existence": {
+            "type": "boolean"
+          },
+          "siblings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "value": {
+            "type": "string"
+          },
+          "aux_existence": {
+            "type": "boolean"
+          },
+          "aux_index": {
+            "type": "string"
+          },
+          "aux_value": {
+            "type": "string"
           }
         }
       }
