@@ -16,6 +16,7 @@ type Config interface {
 
 	IssuerConfiger
 	VerifierConfiger
+	NetworkConfiger
 }
 
 type config struct {
@@ -27,6 +28,7 @@ type config struct {
 
 	IssuerConfiger
 	VerifierConfiger
+	NetworkConfiger
 }
 
 func New(getter kv.Getter) Config {
@@ -38,5 +40,6 @@ func New(getter kv.Getter) Config {
 		Logger:           comfig.NewLogger(getter, comfig.LoggerOpts{}),
 		IssuerConfiger:   NewIssuerConfiger(getter),
 		VerifierConfiger: NewVerifierConfiger(getter),
+		NetworkConfiger:  NewNetworkConfiger(getter),
 	}
 }

@@ -1,0 +1,27 @@
+type: object
+required:
+  - root
+  - existence
+  - siblings
+  - index
+  - value
+  - aux_existence
+  - aux_index
+  - aux_value
+properties:
+  root:
+    type: string
+  existence:
+    type: boolean
+  siblings:
+    type: array
+    items:
+      type: string
+  value:
+    type: string
+  aux_existence:
+    type: boolean
+  aux_index:
+    type: string
+  aux_value:
+    type: string

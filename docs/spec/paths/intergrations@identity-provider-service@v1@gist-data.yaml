@@ -1,0 +1,34 @@
+get:
+  tags:
+    - GIST
+  summary: The GIST data retrieving
+  operationId: gist-data
+  parameters:
+    - in: query
+      name: user_did
+      required: true
+      schema:
+        type: string
+  responses:
+    '200':
+      description: Success
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              data:
+                type: object
+                $ref: '#/components/schemas/GistData'
+    '500':
+      description: Internal Error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Errors'
+    '400':
+      description: Bad Request Error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Errors'

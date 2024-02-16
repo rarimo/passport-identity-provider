@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	stateabi "github.com/iden3/contracts-abi/state/go/abi"
 	"github.com/rarimo/passport-identity-provider/internal/config"
 	"github.com/rarimo/passport-identity-provider/internal/data"
 	"github.com/rarimo/passport-identity-provider/internal/service/issuer"
@@ -15,6 +16,7 @@ const (
 	logCtxKey ctxKey = iota
 	masterQKey
 	verifierConfigKey
+	stateContractKey
 	issuerCtxKey
 	proofsQKey
 	claimsQKey
@@ -48,6 +50,16 @@ func CtxVerifierConfig(entry *config.VerifierConfig) func(context.Context) conte
 
 func VerifierConfig(r *http.Request) *config.VerifierConfig {
 	return r.Context().Value(verifierConfigKey).(*config.VerifierConfig)
+}
+
+func CtxStateContract(entry *stateabi.State) func(context.Context) context.Context {
+	return func(ctx context.Context) context.Context {
+		return context.WithValue(ctx, stateContractKey, entry)
+	}
+}
+
+func StateContract(r *http.Request) *stateabi.State {
+	return r.Context().Value(stateContractKey).(*stateabi.State)
 }
 
 func CtxIssuer(iss *issuer.Issuer) func(context.Context) context.Context {

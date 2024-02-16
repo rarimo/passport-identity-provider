@@ -1,3 +1,7 @@
+network:
+  eth_rpc:
+  state_contract:
+
 verifier:
   verification_keys_paths:
     sha1: "./sha1_verification_key.json"

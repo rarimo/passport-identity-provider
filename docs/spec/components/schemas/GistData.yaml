@@ -1,0 +1,16 @@
+allOf:
+  - $ref: '#/components/schemas/GistDataKey'
+  - type: object
+    required:
+      - attributes
+    properties:
+      attributes:
+        type: object
+        required:
+          - gist_proof
+          - gist_root
+        properties:
+          gist_proof:
+            $ref: '#/components/schemas/GistProof'
+          gist_root:
+            type: string
