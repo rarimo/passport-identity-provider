@@ -393,6 +393,9 @@
               "type": "string"
             }
           },
+          "index": {
+            "type": "string"
+          },
           "value": {
             "type": "string"
           },
