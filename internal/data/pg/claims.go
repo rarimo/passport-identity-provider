@@ -55,6 +55,12 @@ func (q *claimsQ) Get() (*data.Claim, error) {
 	return &result, err
 }
 
+func (q *claimsQ) Select() ([]data.Claim, error) {
+	var result []data.Claim
+	err := q.db.Select(&result, q.sql)
+	return result, err
+}
+
 func (q *claimsQ) DeleteByID(id uuid.UUID) error {
 	if err := q.db.Exec(sq.Delete(claimsTableName).Where(sq.Eq{"id": id})); err != nil {
 		return err

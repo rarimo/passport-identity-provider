@@ -63,7 +63,10 @@ func CreateIdentity(w http.ResponseWriter, r *http.Request) {
 	iss := Issuer(r)
 	masterQ := MasterQ(r)
 
-	claim, err := masterQ.Claim().ResetFilter().FilterBy("user_did", req.Data.ID).Get()
+	claim, err := masterQ.Claim().ResetFilter().
+		FilterBy("user_did", req.Data.ID).
+		FilterBy("revoked", false).
+		Get()
 	if err != nil {
 		Log(r).WithError(err).Error("failed to get claim by user DID")
 		ape.RenderErr(w, problems.InternalError())
@@ -87,75 +90,85 @@ func CreateIdentity(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	cfg := VerifierConfig(r)
+
+	if err := verifySignature(req); err != nil {
+		Log(r).WithError(err).Error("failed to verify signature")
+		ape.RenderErr(w, problems.InternalError())
+		return
+	}
+
+	switch algorithms[req.Data.DocumentSOD.Algorithm] {
+	case SHA1withECDSA:
+		if err := verifier.VerifyGroth16(req.Data.ZKProof, cfg.VerificationKeys[SHA1]); err != nil {
+			Log(r).WithError(err).Error("failed to verify Groth16")
+			ape.RenderErr(w, problems.BadRequest(err)...)
+			return
+		}
+	case SHA256withRSA, SHA256withECDSA:
+		if err := verifier.VerifyGroth16(req.Data.ZKProof, cfg.VerificationKeys[SHA256]); err != nil {
+			Log(r).WithError(err).Error("failed to verify Groth16")
+			ape.RenderErr(w, problems.BadRequest(err)...)
+			return
+		}
+	}
+
+	encapsulatedContentBytes, err := hex.DecodeString(req.Data.DocumentSOD.EncapsulatedContent)
+	if err != nil {
+		Log(r).WithError(err).Error("failed to decode hex string")
+		ape.RenderErr(w, problems.InternalError())
+		return
+	}
+
+	encapsulatedData := resources.EncapsulatedData{}
+	_, err = asn1.Unmarshal(encapsulatedContentBytes, &encapsulatedData)
+	if err != nil {
+		Log(r).WithError(err).Error("failed to unmarshal ASN.1")
+		ape.RenderErr(w, problems.InternalError())
+		return
+	}
+
+	if err := validatePubSignals(cfg, req.Data, encapsulatedData.PrivateKey.El1.OctetStr.Bytes); err != nil {
+		Log(r).WithError(err).Error("failed to validate pub signals")
+		ape.RenderErr(w, problems.BadRequest(err)...)
+		return
+	}
+
+	if err := validateCert([]byte(req.Data.DocumentSOD.PemFile), cfg.MasterCerts); err != nil {
+		Log(r).WithError(err).Error("failed to validate certificate")
+		ape.RenderErr(w, problems.BadRequest(err)...)
+		return
+	}
+
+	identityExpiration, err := getExpirationTimeFromPubSignals(req.Data.ZKProof.PubSignals)
+	if err != nil {
+		Log(r).WithError(err).Error("failed to get expiration time")
+		ape.RenderErr(w, problems.BadRequest(err)...)
+		return
+	}
+
+	issuingAuthority, err := strconv.Atoi(req.Data.ZKProof.PubSignals[2])
+	if err != nil {
+		Log(r).WithError(err).Error("failed to convert string to int")
+		ape.RenderErr(w, problems.InternalError())
+		return
+	}
+
 	if err := masterQ.Transaction(func(db data.MasterQ) error {
-		cfg := VerifierConfig(r)
-
-		if err := verifySignature(req); err != nil {
-			ape.RenderErr(w, problems.InternalError())
-			return errors.Wrap(err, "failed to verify signature")
-		}
-
-		switch algorithms[req.Data.DocumentSOD.Algorithm] {
-		case SHA1withECDSA:
-			if err := verifier.VerifyGroth16(req.Data.ZKProof, cfg.VerificationKeys[SHA1]); err != nil {
-				ape.RenderErr(w, problems.BadRequest(err)...)
-				return errors.Wrap(err, "failed to verify Groth16")
-			}
-		case SHA256withRSA, SHA256withECDSA:
-			if err := verifier.VerifyGroth16(req.Data.ZKProof, cfg.VerificationKeys[SHA256]); err != nil {
-				ape.RenderErr(w, problems.BadRequest(err)...)
-				return errors.Wrap(err, "failed to verify Groth16")
-			}
-		}
-
-		encapsulatedContentBytes, err := hex.DecodeString(req.Data.DocumentSOD.EncapsulatedContent)
-		if err != nil {
-			ape.RenderErr(w, problems.InternalError())
-			return errors.Wrap(err, "failed to decode hex string")
-		}
-
-		encapsulatedData := resources.EncapsulatedData{}
-		_, err = asn1.Unmarshal(encapsulatedContentBytes, &encapsulatedData)
-		if err != nil {
-			ape.RenderErr(w, problems.InternalError())
-			return errors.Wrap(err, "failed to unmarshal ASN.1")
-		}
-
-		if err := validatePubSignals(cfg, req.Data, encapsulatedData.PrivateKey.El1.OctetStr.Bytes); err != nil {
-			ape.RenderErr(w, problems.BadRequest(err)...)
-			return errors.Wrap(err, "failed to validate pub signals")
-		}
-
-		if err := validateCert([]byte(req.Data.DocumentSOD.PemFile), cfg.MasterCerts); err != nil {
-			ape.RenderErr(w, problems.BadRequest(err)...)
-			return errors.Wrap(err, "failed to validate certificate")
-		}
-
-		identityExpiration, err := getExpirationTimeFromPubSignals(req.Data.ZKProof.PubSignals)
-		if err != nil {
-			ape.RenderErr(w, problems.BadRequest(err)...)
-			return errors.Wrap(err, "failed to get expiration time")
-		}
-
-		issuingAuthority, err := strconv.Atoi(req.Data.ZKProof.PubSignals[2])
-		if err != nil {
-			ape.RenderErr(w, problems.InternalError())
-			return errors.Wrap(err, "failed to convert string to int")
-		}
-
-		// check if there is a claim for this document already
-		claim, err := db.Claim().ResetFilter().
+		// check if there are any claims for this document already
+		claims, err := db.Claim().ResetFilter().
 			FilterBy("document", req.Data.DocumentSOD.SignedAttributes).
+			FilterBy("revoked", false).
 			ForUpdate().
-			Get()
+			Select()
 		if err != nil {
 			ape.RenderErr(w, problems.InternalError())
 			return errors.Wrap(err, "failed to get claim")
 		}
 
 		// revoke if so
-		if claim != nil {
-			if err := revokeOutdatedClaim(db, iss, claim.ID); err != nil {
+		for _, claimToRevoke := range claims {
+			if err := revokeOutdatedClaim(db, iss, claimToRevoke.ID); err != nil {
 				ape.RenderErr(w, problems.InternalError())
 				return errors.Wrap(err, "failed to revoke outdated claim")
 			}
