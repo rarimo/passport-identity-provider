@@ -74,6 +74,7 @@ func newGistDataResponse(userDID string, proof abi.IStateGistProof, root *big.In
 					Root:         proof.Root.String(),
 					Existence:    proof.Existence,
 					Siblings:     siblings,
+					Index:        proof.Index.String(),
 					Value:        proof.Value.String(),
 					AuxExistence: proof.AuxExistence,
 					AuxIndex:     proof.AuxIndex.String(),
