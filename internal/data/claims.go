@@ -18,5 +18,4 @@ type Claim struct {
 	UserDID   string    `db:"user_did" structs:"user_did"`
 	IssuerDID string    `db:"issuer_did" structs:"issuer_did"`
 	Document  string    `db:"document" structs:"document"`
-	Revoked   bool      `db:"revoked" structs:"revoked"`
 }

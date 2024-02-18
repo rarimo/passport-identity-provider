@@ -59,44 +59,13 @@ func CreateIdentity(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var claimID string
-	iss := Issuer(r)
-	masterQ := MasterQ(r)
-
-	claim, err := masterQ.Claim().ResetFilter().
-		FilterBy("user_did", req.Data.ID).
-		FilterBy("revoked", false).
-		Get()
-	if err != nil {
-		Log(r).WithError(err).Error("failed to get claim by user DID")
-		ape.RenderErr(w, problems.InternalError())
-		return
-	}
-
-	if claim != nil {
-		response := resources.ClaimResponse{
-			Data: resources.Claim{
-				Key: resources.Key{
-					ID:   claim.ID.String(),
-					Type: resources.CLAIMS,
-				},
-				Attributes: resources.ClaimAttributes{
-					ClaimId:   claim.ID.String(),
-					IssuerDid: claim.IssuerDID,
-				},
-			},
-		}
-		ape.Render(w, response)
-		return
-	}
-
-	cfg := VerifierConfig(r)
-
 	if err := verifySignature(req); err != nil {
 		Log(r).WithError(err).Error("failed to verify signature")
 		ape.RenderErr(w, problems.InternalError())
 		return
 	}
+
+	cfg := VerifierConfig(r)
 
 	switch algorithms[req.Data.DocumentSOD.Algorithm] {
 	case SHA1withECDSA:
@@ -140,6 +109,34 @@ func CreateIdentity(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	masterQ := MasterQ(r)
+
+	claim, err := masterQ.Claim().ResetFilter().
+		FilterBy("user_did", req.Data.ID).
+		Get()
+	if err != nil {
+		Log(r).WithError(err).Error("failed to get claim by user DID")
+		ape.RenderErr(w, problems.InternalError())
+		return
+	}
+
+	if claim != nil {
+		response := resources.ClaimResponse{
+			Data: resources.Claim{
+				Key: resources.Key{
+					ID:   claim.ID.String(),
+					Type: resources.CLAIMS,
+				},
+				Attributes: resources.ClaimAttributes{
+					ClaimId:   claim.ID.String(),
+					IssuerDid: claim.IssuerDID,
+				},
+			},
+		}
+		ape.Render(w, response)
+		return
+	}
+
 	identityExpiration, err := getExpirationTimeFromPubSignals(req.Data.ZKProof.PubSignals)
 	if err != nil {
 		Log(r).WithError(err).Error("failed to get expiration time")
@@ -154,11 +151,13 @@ func CreateIdentity(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var claimID string
+	iss := Issuer(r)
+
 	if err := masterQ.Transaction(func(db data.MasterQ) error {
 		// check if there are any claims for this document already
 		claims, err := db.Claim().ResetFilter().
 			FilterBy("document", req.Data.DocumentSOD.SignedAttributes).
-			FilterBy("revoked", false).
 			ForUpdate().
 			Select()
 		if err != nil {
