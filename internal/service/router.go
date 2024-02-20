@@ -44,6 +44,7 @@ func (s *service) router() chi.Router {
 		r.Route("/v1", func(r chi.Router) {
 			r.Post("/create-identity", handlers.CreateIdentity)
 			r.Get("/gist-data", handlers.GetGistData)
+			r.Get("/document-nullifier", handlers.GetDocumentNullifier)
 		})
 	})
 
