@@ -4,11 +4,8 @@ import "encoding/asn1"
 
 type EncapsulatedData struct {
 	Version             int
-	PrivateKeyAlgorithm struct {
-		Algorithm  asn1.ObjectIdentifier
-		Parameters asn1.RawValue
-	}
-	PrivateKey struct {
+	PrivateKeyAlgorithm asn1.RawValue
+	PrivateKey          struct {
 		El1 struct {
 			Integer  int
 			OctetStr asn1.RawValue
