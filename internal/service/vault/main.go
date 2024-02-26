@@ -80,13 +80,3 @@ func (v *VaultClient) Blinder() (*big.Int, error) {
 
 	return blinder, nil
 }
-
-func (v *VaultClient) PutIssuerAuthData() error {
-	if _, err := v.client.KVv2("secret").Put(context.Background(), "issuer", map[string]interface{}{
-		"login":    "admin",
-		"password": "b19764905ab14bfb949d44efa70cd757",
-	}); err != nil {
-		return errors.Wrap(err, "failed to put secret")
-	}
-	return nil
-}
