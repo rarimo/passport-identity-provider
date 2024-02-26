@@ -1,3 +1,6 @@
+vault:
+  address: "http://127.0.0.1:8200"
+
 network:
   eth_rpc:
   state_contract:
