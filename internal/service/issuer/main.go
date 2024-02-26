@@ -20,13 +20,14 @@ type Issuer struct {
 	did    string
 }
 
-func New(log *logan.Entry, config *config.IssuerConfig) *Issuer {
+func New(log *logan.Entry, config *config.IssuerConfig, login, password string) *Issuer {
 	return &Issuer{
 		client: req.C().
 			SetBaseURL(config.BaseUrl).
+			SetCommonBasicAuth(login, password).
 			SetLogger(log),
 		cfg: config,
-		did: config.DID,
+		did: config.DID.String(),
 	}
 }
 
@@ -80,7 +81,6 @@ func (is *Issuer) IssueVotingClaim(
 	}
 
 	response, err := is.client.R().
-		SetBasicAuth(is.cfg.AuthUsername, is.cfg.AuthPassword).
 		SetBodyJsonMarshal(credentialRequest).
 		SetSuccessResult(&result).
 		Post("/credentials")
@@ -99,7 +99,6 @@ func (is *Issuer) GetCredential(claimID uuid.UUID) (GetCredentialResponse, error
 	var cred GetCredentialResponse
 
 	response, err := is.client.R().
-		SetBasicAuth(is.cfg.AuthUsername, is.cfg.AuthPassword).
 		SetSuccessResult(&cred).
 		SetPathParam("id", claimID.String()).
 		Get("/credentials/{id}")
@@ -116,7 +115,6 @@ func (is *Issuer) GetCredential(claimID uuid.UUID) (GetCredentialResponse, error
 
 func (is *Issuer) RevokeClaim(revocationNonce int64) error {
 	response, err := is.client.R().
-		SetBasicAuth(is.cfg.AuthUsername, is.cfg.AuthPassword).
 		SetPathParam("nonce", strconv.FormatInt(revocationNonce, 10)).
 		Post("/credentials/revoke/{nonce}")
 	if err != nil {

@@ -33,7 +33,12 @@ func GetDocumentNullifier(w http.ResponseWriter, r *http.Request) {
 		nullifierHashInput = append(nullifierHashInput, new(big.Int).SetBytes(dg2HashBytes))
 	}
 
-	nullifierHashInput = append(nullifierHashInput, VerifierConfig(r).Blinder)
+	blinder, err := VaultClient(r).Blinder()
+	if err != nil {
+		Log(r).WithError(err).Error("failed to get blinder from the vault")
+	}
+
+	nullifierHashInput = append(nullifierHashInput, blinder)
 
 	nullifierHash, err := poseidon.Hash(nullifierHashInput)
 	if err != nil {

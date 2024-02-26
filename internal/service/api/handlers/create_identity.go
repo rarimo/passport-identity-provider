@@ -9,7 +9,6 @@ import (
 	"crypto/sha256"
 	"encoding/asn1"
 	"encoding/hex"
-	"encoding/json"
 	"encoding/pem"
 	"fmt"
 	"math/big"
@@ -19,6 +18,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/iden3/go-iden3-crypto/poseidon"
 	"github.com/iden3/go-rapidsnark/verifier"
 	"github.com/rarimo/certificate-transparency-go/x509"
 	"github.com/rarimo/passport-identity-provider/internal/config"
@@ -43,13 +43,14 @@ const (
 	SHA256withECDSA = "SHA256withECDSA"
 )
 
-var algorithms = map[string]string{
-	"SHA256withRSA": SHA256withRSA,
-
-	"SHA1withECDSA":   SHA1withECDSA,
-	"ecdsa-with-SHA1": SHA1withECDSA,
-
-	"SHA256withECDSA": SHA256withECDSA,
+var algorithmsListMap = map[string]map[string]string{
+	"SHA1": {
+		"ECDSA": SHA1withECDSA,
+	},
+	"SHA256": {
+		"RSA":   SHA256withRSA,
+		"ECDSA": SHA256withECDSA,
+	},
 }
 
 func CreateIdentity(w http.ResponseWriter, r *http.Request) {
@@ -59,7 +60,9 @@ func CreateIdentity(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := verifySignature(req); err != nil {
+	algorithm := signatureAlgorithm(req.Data.DocumentSOD.Algorithm)
+
+	if err := verifySignature(req, algorithm); err != nil {
 		Log(r).WithError(err).Error("failed to verify signature")
 		ape.RenderErr(w, problems.InternalError())
 		return
@@ -67,7 +70,7 @@ func CreateIdentity(w http.ResponseWriter, r *http.Request) {
 
 	cfg := VerifierConfig(r)
 
-	switch algorithms[req.Data.DocumentSOD.Algorithm] {
+	switch algorithm {
 	case SHA1withECDSA:
 		if err := verifier.VerifyGroth16(req.Data.ZKProof, cfg.VerificationKeys[SHA1]); err != nil {
 			Log(r).WithError(err).Error("failed to verify Groth16")
@@ -80,6 +83,10 @@ func CreateIdentity(w http.ResponseWriter, r *http.Request) {
 			ape.RenderErr(w, problems.BadRequest(err)...)
 			return
 		}
+	default:
+		Log(r).WithField("algorithm", req.Data.DocumentSOD.Algorithm).Debug("invalid signature algorithm")
+		ape.RenderErr(w, problems.BadRequest(errors.New("invalid signature algorithm"))...)
+		return
 	}
 
 	encapsulatedContentBytes, err := hex.DecodeString(req.Data.DocumentSOD.EncapsulatedContent)
@@ -153,11 +160,26 @@ func CreateIdentity(w http.ResponseWriter, r *http.Request) {
 
 	var claimID string
 	iss := Issuer(r)
+	vaultClient := VaultClient(r)
+
+	blinder, err := vaultClient.Blinder()
+	if err != nil {
+		Log(r).WithError(err).Error("failed to get blinder from the vault")
+		ape.RenderErr(w, problems.InternalError())
+		return
+	}
+
+	hash, err := signedAttributesPoseidonHash(req.Data.DocumentSOD.SignedAttributes, blinder)
+	if err != nil {
+		Log(r).WithError(err).Error("failed to get signed attributes Poseidon hash")
+		ape.RenderErr(w, problems.InternalError())
+		return
+	}
 
 	if err := masterQ.Transaction(func(db data.MasterQ) error {
 		// check if there are any claims for this document already
 		claims, err := db.Claim().ResetFilter().
-			FilterBy("document", req.Data.DocumentSOD.SignedAttributes).
+			FilterBy("document_hash", hash.String()).
 			ForUpdate().
 			Select()
 		if err != nil {
@@ -175,14 +197,14 @@ func CreateIdentity(w http.ResponseWriter, r *http.Request) {
 
 		claimID, err = iss.IssueVotingClaim(
 			req.Data.ID, int64(issuingAuthority), true, identityExpiration,
-			encapsulatedData.PrivateKey.El2.OctetStr.Bytes, cfg.Blinder,
+			encapsulatedData.PrivateKey.El2.OctetStr.Bytes, blinder,
 		)
 		if err != nil {
 			ape.RenderErr(w, problems.InternalError())
 			return errors.Wrap(err, "failed to issue voting claim")
 		}
 
-		if err := writeDataToDB(db, req, claimID, iss.DID()); err != nil {
+		if err := writeDataToDB(db, req, claimID, iss.DID(), hash.String()); err != nil {
 			ape.RenderErr(w, problems.InternalError())
 			return errors.Wrap(err, "failed to write proof to the database")
 		}
@@ -210,6 +232,41 @@ func CreateIdentity(w http.ResponseWriter, r *http.Request) {
 	ape.Render(w, response)
 }
 
+func signatureAlgorithm(passedAlgorithm string) string {
+	if strings.Contains(strings.ToUpper(passedAlgorithm), "PSS") {
+		return "" // RSA-PSS is not currently supported
+	}
+
+	for hashFunc, signatureAlgorithms := range algorithmsListMap {
+		if strings.Contains(strings.ToUpper(passedAlgorithm), hashFunc) {
+			for signatureAlgo, algorithmName := range signatureAlgorithms {
+				if strings.Contains(strings.ToUpper(passedAlgorithm), signatureAlgo) {
+					return algorithmName
+				}
+			}
+		}
+	}
+	return ""
+}
+
+func signedAttributesPoseidonHash(signedAttributes string, blinder *big.Int) (*big.Int, error) {
+	signedAttributesBytes, err := hex.DecodeString(signedAttributes)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to decode hex string")
+	}
+
+	dataToHash := make([]byte, 0)
+	dataToHash = append(dataToHash, signedAttributesBytes...)
+	dataToHash = append(dataToHash, blinder.Bytes()...)
+
+	hash, err := poseidon.HashBytes(dataToHash)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to hash data using Poseidon")
+	}
+
+	return hash, nil
+}
+
 func revokeOutdatedClaim(db data.MasterQ, iss *issuer.Issuer, claimID uuid.UUID) error {
 	cred, err := iss.GetCredential(claimID)
 	if err != nil {
@@ -229,42 +286,17 @@ func revokeOutdatedClaim(db data.MasterQ, iss *issuer.Issuer, claimID uuid.UUID)
 	return nil
 }
 
-func writeDataToDB(db data.MasterQ, req requests.CreateIdentityRequest, claimIDStr, issuerDID string) error {
-	proofData, err := json.Marshal(req.Data.ZKProof.Proof)
-	if err != nil {
-		return errors.Wrap(err, "failed to marshal JSON")
-	}
-
-	pubSignals, err := json.Marshal(req.Data.ZKProof.PubSignals)
-	if err != nil {
-		return errors.Wrap(err, "failed to marshal JSON")
-	}
-
-	DocumentSOD, err := json.Marshal(req.Data.DocumentSOD)
-	if err != nil {
-		return errors.Wrap(err, "failed to marshal JSON")
-	}
-
+func writeDataToDB(db data.MasterQ, req requests.CreateIdentityRequest, claimIDStr, issuerDID, hash string) error {
 	claimID, err := uuid.Parse(claimIDStr)
 	if err != nil {
 		return errors.Wrap(err, "failed to parse uuid")
 	}
 
-	if err := db.Proof().Insert(data.Proof{
-		DID:         req.Data.ID,
-		ClaimID:     claimID,
-		Data:        proofData,
-		PubSignals:  pubSignals,
-		DocumentSOD: DocumentSOD,
-	}); err != nil {
-		return errors.Wrap(err, "failed to insert proof in the database")
-	}
-
 	if err := db.Claim().Insert(data.Claim{
-		ID:        claimID,
-		UserDID:   req.Data.ID,
-		IssuerDID: issuerDID,
-		Document:  req.Data.DocumentSOD.SignedAttributes,
+		ID:           claimID,
+		UserDID:      req.Data.ID,
+		IssuerDID:    issuerDID,
+		DocumentHash: hash,
 	}); err != nil {
 		return errors.Wrap(err, "failed to insert claim in the database")
 	}
@@ -272,7 +304,7 @@ func writeDataToDB(db data.MasterQ, req requests.CreateIdentityRequest, claimIDS
 	return nil
 }
 
-func verifySignature(req requests.CreateIdentityRequest) error {
+func verifySignature(req requests.CreateIdentityRequest, algo string) error {
 	block, _ := pem.Decode([]byte(req.Data.DocumentSOD.PemFile))
 	if block == nil {
 		return fmt.Errorf("invalid certificate: invalid PEM")
@@ -293,7 +325,7 @@ func verifySignature(req requests.CreateIdentityRequest) error {
 		return errors.Wrap(err, "failed to decode hex string")
 	}
 
-	switch algorithms[req.Data.DocumentSOD.Algorithm] {
+	switch algo {
 	case SHA256withRSA:
 		pubKey := cert.PublicKey.(*rsa.PublicKey)
 

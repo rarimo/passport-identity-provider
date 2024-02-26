@@ -8,6 +8,7 @@ import (
 	"github.com/rarimo/passport-identity-provider/internal/data/pg"
 	"github.com/rarimo/passport-identity-provider/internal/service/api/handlers"
 	"github.com/rarimo/passport-identity-provider/internal/service/issuer"
+	"github.com/rarimo/passport-identity-provider/internal/service/vault"
 	"gitlab.com/distributed_lab/ape"
 )
 
@@ -22,6 +23,16 @@ func (s *service) router() chi.Router {
 		s.log.WithError(err).Fatal("failed to init state contract")
 	}
 
+	vaultClient, err := vault.NewVaultClient(s.cfg.VaultConfig())
+	if err != nil {
+		s.log.WithError(err).Fatal("failed to init new vault client")
+	}
+
+	issuerLogin, issuerPassword, err := vaultClient.IssuerAuthData()
+	if err != nil {
+		s.log.WithError(err).Fatal("failed to get issuer auth data from the vault")
+	}
+
 	r := chi.NewRouter()
 
 	r.Use(
@@ -32,12 +43,12 @@ func (s *service) router() chi.Router {
 			handlers.CtxMasterQ(pg.NewMasterQ(s.cfg.DB())),
 			handlers.CtxVerifierConfig(s.cfg.VerifierConfig()),
 			handlers.CtxStateContract(stateContract),
-			handlers.CtxProofsQ(pg.NewProofsQ(s.cfg.DB())),
-			handlers.CtxClaimsQ(pg.NewClaimsQ(s.cfg.DB())),
 			handlers.CtxIssuer(issuer.New(
 				s.cfg.Log().WithField("service", "issuer"),
 				s.cfg.IssuerConfig(),
+				issuerLogin, issuerPassword,
 			)),
+			handlers.CtxVaultClient(vaultClient),
 		),
 	)
 	r.Route("/integrations/identity-provider-service", func(r chi.Router) {
