@@ -36,6 +36,8 @@ func GetDocumentNullifier(w http.ResponseWriter, r *http.Request) {
 	blinder, err := VaultClient(r).Blinder()
 	if err != nil {
 		Log(r).WithError(err).Error("failed to get blinder from the vault")
+		ape.RenderErr(w, problems.InternalError())
+		return
 	}
 
 	nullifierHashInput = append(nullifierHashInput, blinder)
