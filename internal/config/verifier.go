@@ -1,10 +1,12 @@
 package config
 
 import (
+	"os"
+	"time"
+
 	"gitlab.com/distributed_lab/figure/v3"
 	"gitlab.com/distributed_lab/kit/comfig"
 	"gitlab.com/distributed_lab/kit/kv"
-	"os"
 )
 
 type VerifierConfiger interface {
@@ -12,9 +14,10 @@ type VerifierConfiger interface {
 }
 
 type VerifierConfig struct {
-	VerificationKeys map[string][]byte
-	MasterCerts      []byte
-	AllowedAge       int
+	VerificationKeys    map[string][]byte
+	MasterCerts         []byte
+	AllowedAge          int
+	RegistrationTimeout time.Duration
 }
 
 type verifier struct {
@@ -34,10 +37,12 @@ func (v *verifier) VerifierConfig() *VerifierConfig {
 			VerificationKeysPaths map[string]string `fig:"verification_keys_paths,required"`
 			MasterCertsPath       string            `fig:"master_certs_path,required"`
 			AllowedAge            int               `fig:"allowed_age,required"`
+			RegistrationTimeout   time.Duration     `fig:"registration_timeout"`
 		}{}
 
 		err := figure.
 			Out(&newCfg).
+			With(figure.BaseHooks).
 			From(kv.MustGetStringMap(v.getter, "verifier")).
 			Please()
 		if err != nil {
@@ -60,9 +65,10 @@ func (v *verifier) VerifierConfig() *VerifierConfig {
 		}
 
 		return &VerifierConfig{
-			VerificationKeys: verificationKeys,
-			MasterCerts:      masterCerts,
-			AllowedAge:       newCfg.AllowedAge,
+			VerificationKeys:    verificationKeys,
+			MasterCerts:         masterCerts,
+			AllowedAge:          newCfg.AllowedAge,
+			RegistrationTimeout: newCfg.RegistrationTimeout,
 		}
 	}).(*VerifierConfig)
 }

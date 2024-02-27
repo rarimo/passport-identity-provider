@@ -116,7 +116,7 @@ func CreateIdentity(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	masterQ := MasterQ(r)
+	masterQ := MasterQ(r).New()
 
 	claim, err := masterQ.Claim().ResetFilter().
 		FilterBy("user_did", req.Data.ID).
@@ -178,7 +178,7 @@ func CreateIdentity(w http.ResponseWriter, r *http.Request) {
 
 	if err := masterQ.Transaction(func(db data.MasterQ) error {
 		// check if there are any claims for this document already
-		claims, err := db.Claim().ResetFilter().
+		claimsToRevoke, err := db.Claim().ResetFilter().
 			FilterBy("document_hash", hash.String()).
 			ForUpdate().
 			Select()
@@ -188,7 +188,13 @@ func CreateIdentity(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// revoke if so
-		for _, claimToRevoke := range claims {
+		for _, claimToRevoke := range claimsToRevoke {
+			timeoutExpiration := claimToRevoke.CreatedAt.UTC().Add(cfg.RegistrationTimeout)
+			if time.Now().UTC().Before(timeoutExpiration) {
+				ape.RenderErr(w, problems.TooManyRequests())
+				return errors.New("registration timeout is not expired")
+			}
+
 			if err := revokeOutdatedClaim(db, iss, claimToRevoke.ID); err != nil {
 				ape.RenderErr(w, problems.InternalError())
 				return errors.Wrap(err, "failed to revoke outdated claim")

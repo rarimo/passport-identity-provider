@@ -1,6 +1,9 @@
 package data
 
-import "github.com/google/uuid"
+import (
+	"github.com/google/uuid"
+	"time"
+)
 
 type ClaimQ interface {
 	New() ClaimQ
@@ -18,4 +21,5 @@ type Claim struct {
 	UserDID      string    `db:"user_did" structs:"user_did"`
 	IssuerDID    string    `db:"issuer_did" structs:"issuer_did"`
 	DocumentHash string    `db:"document_hash" structs:"document_hash"`
+	CreatedAt    time.Time `db:"created_at" structs:"-"`
 }

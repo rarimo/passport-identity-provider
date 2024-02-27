@@ -11,6 +11,7 @@ verifier:
     sha256: "./sha256_verification_key.json"
   master_certs_path: "./masterList.dev.pem"
   allowed_age: 18
+  registration_timeout: 1h
 
 issuer:
   base_url: "http://localhost:3002/v1"
