@@ -6,6 +6,7 @@ import (
 	"github.com/rarimo/passport-identity-provider/internal/config"
 	"github.com/rarimo/passport-identity-provider/internal/data"
 	"github.com/rarimo/passport-identity-provider/internal/service/issuer"
+	"github.com/rarimo/passport-identity-provider/internal/service/vault"
 	"gitlab.com/distributed_lab/logan/v3"
 	"net/http"
 )
@@ -18,8 +19,7 @@ const (
 	verifierConfigKey
 	stateContractKey
 	issuerCtxKey
-	proofsQKey
-	claimsQKey
+	vaultClientCtxKey
 )
 
 func CtxLog(entry *logan.Entry) func(context.Context) context.Context {
@@ -72,22 +72,12 @@ func Issuer(r *http.Request) *issuer.Issuer {
 	return r.Context().Value(issuerCtxKey).(*issuer.Issuer)
 }
 
-func CtxProofsQ(entry data.ProofQ) func(context.Context) context.Context {
+func CtxVaultClient(vaultClient *vault.VaultClient) func(context.Context) context.Context {
 	return func(ctx context.Context) context.Context {
-		return context.WithValue(ctx, proofsQKey, entry)
+		return context.WithValue(ctx, vaultClientCtxKey, vaultClient)
 	}
 }
 
-func ProofsQ(r *http.Request) data.ProofQ {
-	return r.Context().Value(proofsQKey).(data.ProofQ).New()
-}
-
-func CtxClaimsQ(entry data.ClaimQ) func(context.Context) context.Context {
-	return func(ctx context.Context) context.Context {
-		return context.WithValue(ctx, claimsQKey, entry)
-	}
-}
-
-func ClaimsQ(r *http.Request) data.ClaimQ {
-	return r.Context().Value(claimsQKey).(data.ClaimQ).New()
+func VaultClient(r *http.Request) *vault.VaultClient {
+	return r.Context().Value(vaultClientCtxKey).(*vault.VaultClient)
 }

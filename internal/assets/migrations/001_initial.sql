@@ -1,11 +1,10 @@
 -- +migrate Up
-create table proofs(
-    id           bigserial primary key,
-    did          text  not null,
-    data         jsonb not null,
-    pub_signals  jsonb not null,
-    document_sod jsonb not null
+create table claims(
+    id            uuid primary key,
+    user_did      text not null,
+    issuer_did    text not null,
+    document_hash text not null
 );
 
 -- +migrate Down
-drop table proofs;
+drop table claims;

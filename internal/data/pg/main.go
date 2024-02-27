@@ -25,10 +25,6 @@ func (m *masterQ) Transaction(fn func(q data.MasterQ) error) error {
 	})
 }
 
-func (m *masterQ) Proof() data.ProofQ {
-	return NewProofsQ(m.db)
-}
-
 func (m *masterQ) Claim() data.ClaimQ {
 	return NewClaimsQ(m.db)
 }

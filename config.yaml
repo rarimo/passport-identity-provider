@@ -1,3 +1,6 @@
+vault:
+  address: "http://127.0.0.1:8200"
+
 network:
   eth_rpc:
   state_contract:
@@ -8,13 +11,10 @@ verifier:
     sha256: "./sha256_verification_key.json"
   master_certs_path: "./masterList.dev.pem"
   allowed_age: 18
-  blinder: 1 # big value required
 
 issuer:
   base_url: "http://localhost:3002/v1"
   did: ""
-  auth_username: ""
-  auth_password: ""
   claim_type: "VotingCredential"
   credential_schema: "https://bafybeibbniic63etdbcn5rs5ir5bhelym6ogv46afj35keatzhn2eqnioi.ipfs.w3s.link/VotingCredential.json"
 
