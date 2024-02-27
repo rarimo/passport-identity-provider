@@ -20,6 +20,7 @@ require (
 	github.com/rarimo/certificate-transparency-go v0.0.0-20240216144634-4291bc43f73b
 	github.com/rubenv/sql-migrate v1.6.1
 	gitlab.com/distributed_lab/ape v1.7.1
+	gitlab.com/distributed_lab/dig v0.0.0-20230207152643-c44f80a4294c
 	gitlab.com/distributed_lab/figure v2.1.0+incompatible
 	gitlab.com/distributed_lab/figure/v3 v3.1.3
 	gitlab.com/distributed_lab/kit v1.11.2

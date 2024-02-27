@@ -1,7 +1,7 @@
 package config
 
 import (
-	"github.com/rarimo/passport-identity-provider/internal/config/dig"
+	"gitlab.com/distributed_lab/dig"
 	"gitlab.com/distributed_lab/figure/v3"
 	"gitlab.com/distributed_lab/kit/comfig"
 	"gitlab.com/distributed_lab/kit/kv"
