@@ -55,12 +55,12 @@ func (is *Issuer) IssueVotingClaim(
 		return "", errors.Wrap(err, "failed to hash bytes")
 	}
 
-	credHashInput := make([]byte, 0)
-	credHashInput = append(credHashInput, 1)
-	credHashInput = append(credHashInput, big.NewInt(issuingAuthority).Bytes()...)
-	credHashInput = append(credHashInput, nullifierHash.Bytes()...)
+	credHashInput := make([]*big.Int, 0)
+	credHashInput = append(credHashInput, big.NewInt(1))
+	credHashInput = append(credHashInput, big.NewInt(issuingAuthority))
+	credHashInput = append(credHashInput, nullifierHash)
 
-	credentialHash, err := poseidon.HashBytes(credHashInput)
+	credentialHash, err := poseidon.Hash(credHashInput)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to hash bytes")
 	}
