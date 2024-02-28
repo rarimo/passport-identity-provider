@@ -12,8 +12,9 @@ type VaultConfiger interface {
 }
 
 type VaultConfig struct {
-	Address string `fig:"address,required"`
-	Token   string `dig:"VAULT_TOKEN,clear"`
+	Address   string `fig:"address,required"`
+	MountPath string `fig:"mount_path,required"`
+	Token     string `dig:"VAULT_TOKEN,clear"`
 }
 
 type vault struct {
@@ -40,7 +41,8 @@ func (v *vault) VaultConfig() *VaultConfig {
 		}
 
 		if err := dig.Out(&result).Where(map[string]interface{}{
-			"address": result.Address,
+			"address":    result.Address,
+			"mount_path": result.MountPath,
 		}).Now(); err != nil {
 			panic(err)
 		}

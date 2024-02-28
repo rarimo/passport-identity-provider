@@ -1,5 +1,6 @@
 vault:
   address: "http://127.0.0.1:8200"
+  mount_path: "secret_data"
 
 network:
   eth_rpc:

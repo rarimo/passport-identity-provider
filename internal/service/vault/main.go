@@ -10,27 +10,30 @@ import (
 )
 
 const (
-	vaultMountPath    = "secret"
 	vaultIssuerPath   = "issuer"
 	vaultVerifierPath = "verifier"
 )
 
 type VaultClient struct {
-	client *vaultapi.Client
+	client    *vaultapi.Client
+	mountPath string
 }
 
-func NewVaultClient(config *config.VaultConfig) (*VaultClient, error) {
+func NewVaultClient(cfg *config.VaultConfig) (*VaultClient, error) {
 	conf := vaultapi.DefaultConfig()
-	conf.Address = config.Address
+	conf.Address = cfg.Address
 
 	client, err := vaultapi.NewClient(conf)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to initialize new client")
 	}
 
-	client.SetToken(config.Token)
+	client.SetToken(cfg.Token)
 
-	return &VaultClient{client: client}, nil
+	return &VaultClient{
+		client:    client,
+		mountPath: cfg.MountPath,
+	}, nil
 }
 
 func (v *VaultClient) IssuerAuthData() (string, string, error) {
@@ -39,7 +42,7 @@ func (v *VaultClient) IssuerAuthData() (string, string, error) {
 		IssuerPassword string `fig:"password,required"`
 	}{}
 
-	secret, err := v.client.KVv2(vaultMountPath).Get(context.Background(), vaultIssuerPath)
+	secret, err := v.client.KVv2(v.mountPath).Get(context.Background(), vaultIssuerPath)
 	if err != nil {
 		return "", "", errors.Wrap(err, "failed to get secret")
 	}
@@ -60,7 +63,7 @@ func (v *VaultClient) Blinder() (*big.Int, error) {
 		Blinder string `fig:"blinder,required"`
 	}{}
 
-	secret, err := v.client.KVv2(vaultMountPath).Get(context.Background(), vaultVerifierPath)
+	secret, err := v.client.KVv2(v.mountPath).Get(context.Background(), vaultVerifierPath)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get secret")
 	}
