@@ -448,7 +448,7 @@ func validatePubSignalsCurrentDate(pubSignals []string) error {
 		return fmt.Errorf("invalid day: %w", err)
 	}
 
-	currentTime := time.Now()
+	currentTime := time.Now().UTC()
 
 	if currentTime.Year() != (2000 + year) {
 		return fmt.Errorf("invalid year, expected %d, got %d", currentTime.Year(), 2000+year)
