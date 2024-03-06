@@ -7,7 +7,6 @@ import (
 	"crypto/rsa"
 	"crypto/sha1"
 	"crypto/sha256"
-	"encoding/asn1"
 	"encoding/hex"
 	"encoding/pem"
 	"fmt"
@@ -19,7 +18,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/iden3/go-iden3-crypto/poseidon"
-	"github.com/iden3/go-rapidsnark/verifier"
 	"github.com/rarimo/certificate-transparency-go/x509"
 	"github.com/rarimo/passport-identity-provider/internal/config"
 	"github.com/rarimo/passport-identity-provider/internal/data"
@@ -60,61 +58,7 @@ func CreateIdentity(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	algorithm := signatureAlgorithm(req.Data.DocumentSOD.Algorithm)
-
-	if err := verifySignature(req, algorithm); err != nil {
-		Log(r).WithError(err).Error("failed to verify signature")
-		ape.RenderErr(w, problems.InternalError())
-		return
-	}
-
 	cfg := VerifierConfig(r)
-
-	switch algorithm {
-	case SHA1withECDSA:
-		if err := verifier.VerifyGroth16(req.Data.ZKProof, cfg.VerificationKeys[SHA1]); err != nil {
-			Log(r).WithError(err).Error("failed to verify Groth16")
-			ape.RenderErr(w, problems.BadRequest(err)...)
-			return
-		}
-	case SHA256withRSA, SHA256withECDSA:
-		if err := verifier.VerifyGroth16(req.Data.ZKProof, cfg.VerificationKeys[SHA256]); err != nil {
-			Log(r).WithError(err).Error("failed to verify Groth16")
-			ape.RenderErr(w, problems.BadRequest(err)...)
-			return
-		}
-	default:
-		Log(r).WithField("algorithm", req.Data.DocumentSOD.Algorithm).Debug("invalid signature algorithm")
-		ape.RenderErr(w, problems.BadRequest(errors.New("invalid signature algorithm"))...)
-		return
-	}
-
-	encapsulatedContentBytes, err := hex.DecodeString(req.Data.DocumentSOD.EncapsulatedContent)
-	if err != nil {
-		Log(r).WithError(err).Error("failed to decode hex string")
-		ape.RenderErr(w, problems.InternalError())
-		return
-	}
-
-	encapsulatedData := resources.EncapsulatedData{}
-	_, err = asn1.Unmarshal(encapsulatedContentBytes, &encapsulatedData)
-	if err != nil {
-		Log(r).WithError(err).Error("failed to unmarshal ASN.1")
-		ape.RenderErr(w, problems.InternalError())
-		return
-	}
-
-	if err := validatePubSignals(cfg, req.Data, encapsulatedData.PrivateKey.El1.OctetStr.Bytes); err != nil {
-		Log(r).WithError(err).Error("failed to validate pub signals")
-		ape.RenderErr(w, problems.BadRequest(err)...)
-		return
-	}
-
-	if err := validateCert([]byte(req.Data.DocumentSOD.PemFile), cfg.MasterCerts); err != nil {
-		Log(r).WithError(err).Error("failed to validate certificate")
-		ape.RenderErr(w, problems.BadRequest(err)...)
-		return
-	}
 
 	masterQ := MasterQ(r).New()
 
@@ -144,19 +88,9 @@ func CreateIdentity(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	identityExpiration, err := getExpirationTimeFromPubSignals(req.Data.ZKProof.PubSignals)
-	if err != nil {
-		Log(r).WithError(err).Error("failed to get expiration time")
-		ape.RenderErr(w, problems.BadRequest(err)...)
-		return
-	}
+	identityExpiration := time.Now().Add(time.Hour * 24 * 300)
 
-	issuingAuthority, err := strconv.Atoi(req.Data.ZKProof.PubSignals[2])
-	if err != nil {
-		Log(r).WithError(err).Error("failed to convert string to int")
-		ape.RenderErr(w, problems.InternalError())
-		return
-	}
+	issuingAuthority := 4903594
 
 	var claimID string
 	iss := Issuer(r)
@@ -201,9 +135,14 @@ func CreateIdentity(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
+		h := sha256.New()
+		h.Write([]byte(req.Data.DocumentSOD.EncapsulatedContent))
+
+		dg2 := h.Sum(nil)
+
 		claimID, err = iss.IssueVotingClaim(
-			req.Data.ID, int64(issuingAuthority), true, identityExpiration,
-			encapsulatedData.PrivateKey.El2.OctetStr.Bytes, blinder,
+			req.Data.ID, int64(issuingAuthority), true, &identityExpiration,
+			dg2, blinder,
 		)
 		if err != nil {
 			ape.RenderErr(w, problems.InternalError())
