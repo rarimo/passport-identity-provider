@@ -167,63 +167,6 @@
         }
       }
     },
-    "/intergrations/identity-provider-service/v1/document-nullifier": {
-      "get": {
-        "tags": [
-          "Document Nullifier"
-        ],
-        "summary": "Document Nullifier retrieving",
-        "operationId": "document-nullifier",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "dg2_hash",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "data": {
-                      "type": "object",
-                      "$ref": "#/components/schemas/DocumentNullifier"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Errors"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Errors"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/intergrations/identity-provider-service/v1/gist-data": {
       "get": {
         "tags": [
@@ -328,50 +271,6 @@
             "type": "string",
             "enum": [
               "claims"
-            ]
-          }
-        }
-      },
-      "DocumentNullifier": {
-        "allOf": [
-          {
-            "$ref": "#/components/schemas/DocumentNullifierKey"
-          },
-          {
-            "type": "object",
-            "required": [
-              "attributes"
-            ],
-            "properties": {
-              "attributes": {
-                "type": "object",
-                "required": [
-                  "document_nullifier_hash"
-                ],
-                "properties": {
-                  "document_nullifier_hash": {
-                    "type": "string"
-                  }
-                }
-              }
-            }
-          }
-        ]
-      },
-      "DocumentNullifierKey": {
-        "type": "object",
-        "required": [
-          "id",
-          "type"
-        ],
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "type": {
-            "type": "string",
-            "enum": [
-              "nullifiers"
             ]
           }
         }
