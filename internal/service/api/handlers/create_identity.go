@@ -279,12 +279,12 @@ func validateSignedAttributes(signedAttributes, encapsulatedContent []byte, algo
 		return errors.Wrap(err, "failed to unmarshal ASN1 with params")
 	}
 
-	if len(signedAttributesASN1) < 2 {
-		return errors.New("signed attributes amount is less than 2")
+	if len(signedAttributesASN1) == 0 {
+		return errors.New("signed attributes amount is 0")
 	}
 
 	digestAttr := resources.DigestAttribute{}
-	if _, err := asn1.Unmarshal(signedAttributesASN1[1].FullBytes, &digestAttr); err != nil {
+	if _, err := asn1.Unmarshal(signedAttributesASN1[len(signedAttributesASN1)-1].FullBytes, &digestAttr); err != nil {
 		return errors.Wrap(err, "failed to unmarshal ASN1")
 	}
 
