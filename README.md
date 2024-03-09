@@ -148,5 +148,5 @@ You can [install it locally](https://www.postgresql.org/download/) or use [docke
 
 ## Contact
 
-Responsible Roman Harazha
-The primary contact for this project is  t.me/overcoatocracy
+Responsible
+The primary contact for this project is  [//]: # (TODO: place link to your telegram and email)
