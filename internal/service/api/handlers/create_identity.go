@@ -298,6 +298,8 @@ func validateSignedAttributes(signedAttributes, encapsulatedContent []byte, algo
 		h := sha256.New()
 		h.Write(encapsulatedContent)
 		d = h.Sum(nil)
+	default:
+		return errors.New(fmt.Sprintf("%s is not supported algorithm", algorithm))
 	}
 
 	if len(digestAttr.Digest) == 0 {
