@@ -49,6 +49,7 @@ func (s *service) router() chi.Router {
 				issuerLogin, issuerPassword,
 			)),
 			handlers.CtxVaultClient(vaultClient),
+			handlers.CtxEthClient(ethCli),
 		),
 	)
 	r.Route("/integrations/identity-provider-service", func(r chi.Router) {

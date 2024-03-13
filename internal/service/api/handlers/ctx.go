@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"github.com/ethereum/go-ethereum/ethclient"
 	stateabi "github.com/iden3/contracts-abi/state/go/abi"
 	"github.com/rarimo/passport-identity-provider/internal/config"
 	"github.com/rarimo/passport-identity-provider/internal/data"
@@ -20,6 +21,7 @@ const (
 	stateContractKey
 	issuerCtxKey
 	vaultClientCtxKey
+	ethClientCtxKey
 )
 
 func CtxLog(entry *logan.Entry) func(context.Context) context.Context {
@@ -80,4 +82,14 @@ func CtxVaultClient(vaultClient *vault.VaultClient) func(context.Context) contex
 
 func VaultClient(r *http.Request) *vault.VaultClient {
 	return r.Context().Value(vaultClientCtxKey).(*vault.VaultClient)
+}
+
+func CtxEthClient(client *ethclient.Client) func(context.Context) context.Context {
+	return func(ctx context.Context) context.Context {
+		return context.WithValue(ctx, ethClientCtxKey, client)
+	}
+}
+
+func EthClient(r *http.Request) *ethclient.Client {
+	return r.Context().Value(ethClientCtxKey).(*ethclient.Client)
 }

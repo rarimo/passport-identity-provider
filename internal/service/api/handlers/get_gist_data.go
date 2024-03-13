@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"math/big"
 	"net/http"
 
@@ -35,16 +36,27 @@ func GetGistData(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	blockNum, err := EthClient(r).BlockNumber(context.Background())
+	if err != nil {
+		Log(r).WithError(err).Error("failed to get block number")
+		ape.RenderErr(w, problems.InternalError())
+		return
+	}
+
 	stateContract := StateContract(r)
 
-	gistProof, err := stateContract.GetGISTProof(&bind.CallOpts{}, userID.BigInt())
+	gistProof, err := stateContract.GetGISTProof(&bind.CallOpts{
+		BlockNumber: new(big.Int).SetUint64(blockNum),
+	}, userID.BigInt())
 	if err != nil {
 		Log(r).WithError(err).Error("failed to get GIST proof")
 		ape.RenderErr(w, problems.InternalError())
 		return
 	}
 
-	gistRoot, err := stateContract.GetGISTRoot(&bind.CallOpts{})
+	gistRoot, err := stateContract.GetGISTRoot(&bind.CallOpts{
+		BlockNumber: new(big.Int).SetUint64(blockNum),
+	})
 	if err != nil {
 		Log(r).WithError(err).Error("failed to get GIST root")
 		ape.RenderErr(w, problems.InternalError())
