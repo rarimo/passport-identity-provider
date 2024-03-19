@@ -62,6 +62,11 @@ func CreateIdentity(w http.ResponseWriter, r *http.Request) {
 	}
 
 	algorithm := signatureAlgorithm(req.Data.DocumentSOD.Algorithm)
+	if algorithm == "" {
+		Log(r).WithError(fmt.Errorf("%s is not a valid algorithm", req.Data.DocumentSOD.Algorithm)).Error("failed to select signature algorithm")
+		ape.RenderErr(w, problems.BadRequest(fmt.Errorf("%s is not a valid algorithm", req.Data.DocumentSOD.Algorithm))...)
+		return
+	}
 
 	signedAttributes, err := hex.DecodeString(req.Data.DocumentSOD.SignedAttributes)
 	if err != nil {
@@ -139,7 +144,7 @@ func CreateIdentity(w http.ResponseWriter, r *http.Request) {
 	masterQ := MasterQ(r)
 
 	claim, err := masterQ.Claim().ResetFilter().
-		FilterBy("user_did", req.Data.ID).
+		FilterBy("user_did", req.Data.ID.String()).
 		Get()
 	if err != nil {
 		Log(r).WithError(err).Error("failed to get claim by user DID")
@@ -222,7 +227,7 @@ func CreateIdentity(w http.ResponseWriter, r *http.Request) {
 		}
 
 		claimID, err = iss.IssueVotingClaim(
-			req.Data.ID, int64(issuingAuthority), true, identityExpiration,
+			req.Data.ID.String(), int64(issuingAuthority), true, identityExpiration,
 			encapsulatedData.PrivateKey.El2.OctetStr.Bytes, blinder,
 		)
 		if err != nil {
@@ -374,7 +379,7 @@ func writeDataToDB(db data.MasterQ, req requests.CreateIdentityRequest, claimIDS
 
 	if err := db.Claim().Insert(data.Claim{
 		ID:           claimID,
-		UserDID:      req.Data.ID,
+		UserDID:      req.Data.ID.String(),
 		IssuerDID:    issuerDID,
 		DocumentHash: hash,
 	}); err != nil {
