@@ -318,6 +318,10 @@ func validateSignedAttributes(signedAttributes, encapsulatedContent []byte, algo
 }
 
 func signatureAlgorithm(passedAlgorithm string) string {
+	if passedAlgorithm == "rsaEncryption" {
+		return SHA256withRSA
+	}
+
 	if strings.Contains(strings.ToUpper(passedAlgorithm), "PSS") {
 		return "" // RSA-PSS is not currently supported
 	}
