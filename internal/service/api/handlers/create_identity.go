@@ -24,10 +24,10 @@ import (
 	"github.com/rarimo/passport-identity-provider/internal/config"
 	"github.com/rarimo/passport-identity-provider/internal/data"
 	"github.com/rarimo/passport-identity-provider/internal/service/api/requests"
-	"github.com/rarimo/passport-identity-provider/internal/service/issuer"
 	"github.com/rarimo/passport-identity-provider/resources"
 	"gitlab.com/distributed_lab/ape"
 	"gitlab.com/distributed_lab/ape/problems"
+	"gitlab.com/distributed_lab/logan/v3"
 	"gitlab.com/distributed_lab/logan/v3/errors"
 )
 
@@ -141,34 +141,6 @@ func CreateIdentity(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	masterQ := MasterQ(r)
-
-	claim, err := masterQ.Claim().ResetFilter().
-		FilterBy("user_did", req.Data.ID.String()).
-		Get()
-	if err != nil {
-		Log(r).WithError(err).Error("failed to get claim by user DID")
-		ape.RenderErr(w, problems.InternalError())
-		return
-	}
-
-	if claim != nil {
-		response := resources.ClaimResponse{
-			Data: resources.Claim{
-				Key: resources.Key{
-					ID:   claim.ID.String(),
-					Type: resources.CLAIMS,
-				},
-				Attributes: resources.ClaimAttributes{
-					ClaimId:   claim.ID.String(),
-					IssuerDid: claim.IssuerDID,
-				},
-			},
-		}
-		ape.Render(w, response)
-		return
-	}
-
 	identityExpiration, err := getExpirationTimeFromPubSignals(req.Data.ZKProof.PubSignals)
 	if err != nil {
 		Log(r).WithError(err).Error("failed to get expiration time")
@@ -194,38 +166,21 @@ func CreateIdentity(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	hash, err := signedAttributesPoseidonHash(req.Data.DocumentSOD.SignedAttributes, blinder)
+	nullifier, err := signedAttributesPoseidonHash(req.Data.DocumentSOD.SignedAttributes, blinder)
+	if err != nil {
+		Log(r).WithError(err).Error("failed to get nullifier Poseidon hash")
+		ape.RenderErr(w, problems.InternalError())
+		return
+	}
+
+	documentHash, err := hashDocument(req.Data.DocumentSOD.SignedAttributes)
 	if err != nil {
 		Log(r).WithError(err).Error("failed to get signed attributes Poseidon hash")
 		ape.RenderErr(w, problems.InternalError())
 		return
 	}
 
-	if err := masterQ.Transaction(func(db data.MasterQ) error {
-		// check if there are any claims for this document already
-		claimsToRevoke, err := db.Claim().ResetFilter().
-			FilterBy("document_hash", hash.String()).
-			ForUpdate().
-			Select()
-		if err != nil {
-			ape.RenderErr(w, problems.InternalError())
-			return errors.Wrap(err, "failed to get claim")
-		}
-
-		// revoke if so
-		for _, claimToRevoke := range claimsToRevoke {
-			timeoutExpiration := claimToRevoke.CreatedAt.UTC().Add(cfg.RegistrationTimeout)
-			if time.Now().UTC().Before(timeoutExpiration) {
-				ape.RenderErr(w, problems.TooManyRequests())
-				return errors.New("registration timeout is not expired")
-			}
-
-			if err := revokeOutdatedClaim(db, iss, claimToRevoke.ID); err != nil {
-				ape.RenderErr(w, problems.InternalError())
-				return errors.Wrap(err, "failed to revoke outdated claim")
-			}
-		}
-
+	if err := MasterQ(r).Transaction(func(db data.MasterQ) error {
 		claimID, err = iss.IssueVotingClaim(
 			req.Data.ID.String(), int64(issuingAuthority), true, identityExpiration,
 			encapsulatedData.PrivateKey.El2.OctetStr.Bytes, blinder,
@@ -235,7 +190,7 @@ func CreateIdentity(w http.ResponseWriter, r *http.Request) {
 			return errors.Wrap(err, "failed to issue voting claim")
 		}
 
-		if err := writeDataToDB(db, req, claimID, iss.DID(), hash.String()); err != nil {
+		if err = writeDataToDB(db, req, claimID, iss.DID(), nullifier.String(), documentHash.String()); err != nil {
 			ape.RenderErr(w, problems.InternalError())
 			return errors.Wrap(err, "failed to write proof to the database")
 		}
@@ -347,6 +302,7 @@ func signedAttributesPoseidonHash(signedAttributes string, blinder *big.Int) (*b
 	dataToHash := make([]byte, 0)
 	dataToHash = append(dataToHash, signedAttributesBytes...)
 	dataToHash = append(dataToHash, blinder.Bytes()...)
+	dataToHash = append(dataToHash, new(big.Int).SetUint64(uint64(time.Now().UTC().UnixNano())).Bytes()...)
 
 	hash, err := poseidon.HashBytes(dataToHash)
 	if err != nil {
@@ -356,26 +312,27 @@ func signedAttributesPoseidonHash(signedAttributes string, blinder *big.Int) (*b
 	return hash, nil
 }
 
-func revokeOutdatedClaim(db data.MasterQ, iss *issuer.Issuer, claimID uuid.UUID) error {
-	cred, err := iss.GetCredential(claimID)
+func hashDocument(signedAttributes string) (*big.Int, error) {
+	decodedSignedAttributes, err := hex.DecodeString(signedAttributes)
 	if err != nil {
-		return errors.Wrap(err, "failed to get credential")
+		return nil, errors.Wrap(err, "failed to decode signed attributes", logan.F{
+			"attributes": signedAttributes,
+		})
 	}
 
-	if !cred.Revoked {
-		if err := iss.RevokeClaim(cred.RevNonce); err != nil {
-			return errors.Wrap(err, "failed to revoke claim")
-		}
+	hash, err := poseidon.HashBytes(decodedSignedAttributes)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to hash data using Poseidon")
 	}
 
-	if err := db.Claim().DeleteByID(claimID); err != nil {
-		return errors.Wrap(err, "failed to delete claim")
-	}
-
-	return nil
+	return hash, nil
 }
 
-func writeDataToDB(db data.MasterQ, req requests.CreateIdentityRequest, claimIDStr, issuerDID, hash string) error {
+func writeDataToDB(
+	db data.MasterQ,
+	req requests.CreateIdentityRequest,
+	claimIDStr, issuerDID, nullifier, documentHash string,
+) error {
 	claimID, err := uuid.Parse(claimIDStr)
 	if err != nil {
 		return errors.Wrap(err, "failed to parse uuid")
@@ -385,7 +342,8 @@ func writeDataToDB(db data.MasterQ, req requests.CreateIdentityRequest, claimIDS
 		ID:           claimID,
 		UserDID:      req.Data.ID.String(),
 		IssuerDID:    issuerDID,
-		DocumentHash: hash,
+		Nullifier:    nullifier,
+		DocumentHash: documentHash,
 	}); err != nil {
 		return errors.Wrap(err, "failed to insert claim in the database")
 	}

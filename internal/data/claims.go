@@ -20,6 +20,7 @@ type Claim struct {
 	ID           uuid.UUID `db:"id" structs:"id"`
 	UserDID      string    `db:"user_did" structs:"user_did"`
 	IssuerDID    string    `db:"issuer_did" structs:"issuer_did"`
+	Nullifier    string    `db:"nullifier" structs:"nullifier"`
 	DocumentHash string    `db:"document_hash" structs:"document_hash"`
 	CreatedAt    time.Time `db:"created_at" structs:"-"`
 }
