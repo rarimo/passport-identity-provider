@@ -141,6 +141,34 @@ func CreateIdentity(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	masterQ := MasterQ(r)
+
+	claim, err := masterQ.Claim().ResetFilter().
+		FilterBy("user_did", req.Data.ID.String()).
+		Get()
+	if err != nil {
+		Log(r).WithError(err).Error("failed to get claim by user DID")
+		ape.RenderErr(w, problems.InternalError())
+		return
+	}
+
+	if claim != nil {
+		response := resources.ClaimResponse{
+			Data: resources.Claim{
+				Key: resources.Key{
+					ID:   claim.ID.String(),
+					Type: resources.CLAIMS,
+				},
+				Attributes: resources.ClaimAttributes{
+					ClaimId:   claim.ID.String(),
+					IssuerDid: claim.IssuerDID,
+				},
+			},
+		}
+		ape.Render(w, response)
+		return
+	}
+
 	identityExpiration, err := getExpirationTimeFromPubSignals(req.Data.ZKProof.PubSignals)
 	if err != nil {
 		Log(r).WithError(err).Error("failed to get expiration time")
@@ -180,7 +208,7 @@ func CreateIdentity(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := MasterQ(r).Transaction(func(db data.MasterQ) error {
+	if err := masterQ.Transaction(func(db data.MasterQ) error {
 		claimID, err = iss.IssueVotingClaim(
 			req.Data.ID.String(), int64(issuingAuthority), true, identityExpiration,
 			encapsulatedData.PrivateKey.El2.OctetStr.Bytes, blinder,
