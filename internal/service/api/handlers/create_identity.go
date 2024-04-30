@@ -195,16 +195,16 @@ func CreateIdentity(w http.ResponseWriter, r *http.Request) {
 	}
 
 	salt := new(big.Int).SetUint64(uint64(time.Now().UTC().UnixNano()))
-	nullifier, err := signedAttributesPoseidonHash(req.Data.DocumentSOD.SignedAttributes, salt, blinder)
+	documentHash, err := hashDocument(req.Data.DocumentSOD.SignedAttributes)
 	if err != nil {
-		Log(r).WithError(err).Error("failed to get nullifier Poseidon hash")
+		Log(r).WithError(err).Error("failed to get signed attributes Poseidon hash")
 		ape.RenderErr(w, problems.InternalError())
 		return
 	}
 
-	documentHash, err := hashDocument(req.Data.DocumentSOD.SignedAttributes)
+	nullifier, err := signedAttributesPoseidonHash(documentHash, salt, blinder)
 	if err != nil {
-		Log(r).WithError(err).Error("failed to get signed attributes Poseidon hash")
+		Log(r).WithError(err).Error("failed to get nullifier Poseidon hash")
 		ape.RenderErr(w, problems.InternalError())
 		return
 	}
@@ -328,14 +328,9 @@ func signatureAlgorithm(passedAlgorithm string) string {
 	return ""
 }
 
-func signedAttributesPoseidonHash(signedAttributes string, salt *big.Int, blinder *big.Int) (*big.Int, error) {
-	signedAttributesBytes, err := hex.DecodeString(signedAttributes)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to decode hex string")
-	}
-
+func signedAttributesPoseidonHash(documentHash, salt, blinder *big.Int) (*big.Int, error) {
 	dataToHash := make([]byte, 0)
-	dataToHash = append(dataToHash, signedAttributesBytes...)
+	dataToHash = append(dataToHash, documentHash.Bytes()...)
 	dataToHash = append(dataToHash, blinder.Bytes()...)
 	dataToHash = append(dataToHash, salt.Bytes()...)
 
