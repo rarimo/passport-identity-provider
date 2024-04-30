@@ -194,7 +194,7 @@ func CreateIdentity(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	salt := new(big.Int).SetUint64(uint64(time.Now().UTC().UnixNano()))
+	salt := new(big.Int).SetUint64(uint64(time.Now().UTC().UnixMilli()))
 	documentHash, err := hashDocument(req.Data.DocumentSOD.SignedAttributes)
 	if err != nil {
 		Log(r).WithError(err).Error("failed to get signed attributes Poseidon hash")
