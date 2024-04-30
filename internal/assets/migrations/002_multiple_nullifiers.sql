@@ -8,6 +8,7 @@ ALTER TABLE claims
 
 -- +migrate Down
 ALTER TABLE claims
+    DROP COLUMN salt,
     DROP COLUMN document_hash;
 
 ALTER TABLE claims
