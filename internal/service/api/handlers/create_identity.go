@@ -194,7 +194,8 @@ func CreateIdentity(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	nullifier, err := signedAttributesPoseidonHash(req.Data.DocumentSOD.SignedAttributes, blinder)
+	salt := new(big.Int).SetUint64(uint64(time.Now().UTC().UnixNano()))
+	nullifier, err := signedAttributesPoseidonHash(req.Data.DocumentSOD.SignedAttributes, salt, blinder)
 	if err != nil {
 		Log(r).WithError(err).Error("failed to get nullifier Poseidon hash")
 		ape.RenderErr(w, problems.InternalError())
@@ -218,7 +219,13 @@ func CreateIdentity(w http.ResponseWriter, r *http.Request) {
 			return errors.Wrap(err, "failed to issue voting claim")
 		}
 
-		if err = writeDataToDB(db, req, claimID, iss.DID(), nullifier.String(), documentHash.String()); err != nil {
+		if err = writeDataToDB(db, claimID, data.Claim{
+			UserDID:      req.Data.ID.String(),
+			IssuerDID:    iss.DID(),
+			Nullifier:    nullifier.String(),
+			Salt:         salt.String(),
+			DocumentHash: documentHash.String(),
+		}); err != nil {
 			ape.RenderErr(w, problems.InternalError())
 			return errors.Wrap(err, "failed to write proof to the database")
 		}
@@ -321,7 +328,7 @@ func signatureAlgorithm(passedAlgorithm string) string {
 	return ""
 }
 
-func signedAttributesPoseidonHash(signedAttributes string, blinder *big.Int) (*big.Int, error) {
+func signedAttributesPoseidonHash(signedAttributes string, salt *big.Int, blinder *big.Int) (*big.Int, error) {
 	signedAttributesBytes, err := hex.DecodeString(signedAttributes)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to decode hex string")
@@ -330,7 +337,7 @@ func signedAttributesPoseidonHash(signedAttributes string, blinder *big.Int) (*b
 	dataToHash := make([]byte, 0)
 	dataToHash = append(dataToHash, signedAttributesBytes...)
 	dataToHash = append(dataToHash, blinder.Bytes()...)
-	dataToHash = append(dataToHash, new(big.Int).SetUint64(uint64(time.Now().UTC().UnixNano())).Bytes()...)
+	dataToHash = append(dataToHash, salt.Bytes()...)
 
 	hash, err := poseidon.HashBytes(dataToHash)
 	if err != nil {
@@ -358,21 +365,16 @@ func hashDocument(signedAttributes string) (*big.Int, error) {
 
 func writeDataToDB(
 	db data.MasterQ,
-	req requests.CreateIdentityRequest,
-	claimIDStr, issuerDID, nullifier, documentHash string,
+	claimIDStr string,
+	claim data.Claim,
 ) error {
-	claimID, err := uuid.Parse(claimIDStr)
+	var err error
+	claim.ID, err = uuid.Parse(claimIDStr)
 	if err != nil {
 		return errors.Wrap(err, "failed to parse uuid")
 	}
 
-	if err := db.Claim().Insert(data.Claim{
-		ID:           claimID,
-		UserDID:      req.Data.ID.String(),
-		IssuerDID:    issuerDID,
-		Nullifier:    nullifier,
-		DocumentHash: documentHash,
-	}); err != nil {
+	if err = db.Claim().Insert(claim); err != nil {
 		return errors.Wrap(err, "failed to insert claim in the database")
 	}
 
