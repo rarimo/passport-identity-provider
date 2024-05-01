@@ -27,7 +27,6 @@ import (
 	"github.com/rarimo/passport-identity-provider/resources"
 	"gitlab.com/distributed_lab/ape"
 	"gitlab.com/distributed_lab/ape/problems"
-	"gitlab.com/distributed_lab/logan/v3"
 	"gitlab.com/distributed_lab/logan/v3/errors"
 )
 
@@ -194,25 +193,26 @@ func CreateIdentity(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// timestamp is only 6 bytes long, if using some other salt, make sure that it is
+	// < 32 to be compatible with Poseidon hash function
 	salt := new(big.Int).SetUint64(uint64(time.Now().UTC().UnixMilli()))
-	documentHash, err := hashDocument(req.Data.DocumentSOD.SignedAttributes)
+	documentHash, err := poseidon.HashBytes(signedAttributes)
 	if err != nil {
-		Log(r).WithError(err).Error("failed to get signed attributes Poseidon hash")
+		Log(r).WithError(err).Error("failed to hash signed attributes")
 		ape.RenderErr(w, problems.InternalError())
 		return
 	}
 
-	nullifier, err := signedAttributesPoseidonHash(documentHash, salt, blinder)
+	nullifier, err := poseidon.Hash([]*big.Int{documentHash, blinder, salt})
 	if err != nil {
-		Log(r).WithError(err).Error("failed to get nullifier Poseidon hash")
+		Log(r).WithError(err).Error("failed to build nullifier")
 		ape.RenderErr(w, problems.InternalError())
 		return
 	}
 
 	if err := masterQ.Transaction(func(db data.MasterQ) error {
 		claimID, err = iss.IssueVotingClaim(
-			req.Data.ID.String(), int64(issuingAuthority), true, identityExpiration,
-			encapsulatedData.PrivateKey.El2.OctetStr.Bytes, blinder,
+			req.Data.ID.String(), int64(issuingAuthority), true, identityExpiration, nullifier,
 		)
 		if err != nil {
 			ape.RenderErr(w, problems.InternalError())
@@ -326,36 +326,6 @@ func signatureAlgorithm(passedAlgorithm string) string {
 		}
 	}
 	return ""
-}
-
-func signedAttributesPoseidonHash(documentHash, salt, blinder *big.Int) (*big.Int, error) {
-	dataToHash := make([]byte, 0)
-	dataToHash = append(dataToHash, documentHash.Bytes()...)
-	dataToHash = append(dataToHash, blinder.Bytes()...)
-	dataToHash = append(dataToHash, salt.Bytes()...)
-
-	hash, err := poseidon.HashBytes(dataToHash)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to hash data using Poseidon")
-	}
-
-	return hash, nil
-}
-
-func hashDocument(signedAttributes string) (*big.Int, error) {
-	decodedSignedAttributes, err := hex.DecodeString(signedAttributes)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to decode signed attributes", logan.F{
-			"attributes": signedAttributes,
-		})
-	}
-
-	hash, err := poseidon.HashBytes(decodedSignedAttributes)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to hash data using Poseidon")
-	}
-
-	return hash, nil
 }
 
 func writeDataToDB(
