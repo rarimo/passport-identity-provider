@@ -36,29 +36,14 @@ func (is *Issuer) DID() string {
 }
 
 func (is *Issuer) IssueVotingClaim(
-	id string, issuingAuthority int64, isAdult bool, expiration *time.Time, dg2 []byte, blinder *big.Int,
+	id string, issuingAuthority int64, isAdult bool, expiration *time.Time, nullifier *big.Int,
 ) (string, error) {
 	var result UUIDResponse
-
-	nullifierHashInput := make([]*big.Int, 0)
-	if len(dg2) >= 32 {
-		// break data in a half
-		nullifierHashInput = append(nullifierHashInput, new(big.Int).SetBytes(dg2[:len(dg2)/2]))
-		nullifierHashInput = append(nullifierHashInput, new(big.Int).SetBytes(dg2[len(dg2)/2:]))
-	} else {
-		nullifierHashInput = append(nullifierHashInput, new(big.Int).SetBytes(dg2))
-	}
-	nullifierHashInput = append(nullifierHashInput, blinder)
-
-	nullifierHash, err := poseidon.Hash(nullifierHashInput)
-	if err != nil {
-		return "", errors.Wrap(err, "failed to hash bytes")
-	}
 
 	credHashInput := make([]*big.Int, 0)
 	credHashInput = append(credHashInput, big.NewInt(1))
 	credHashInput = append(credHashInput, big.NewInt(issuingAuthority))
-	credHashInput = append(credHashInput, nullifierHash)
+	credHashInput = append(credHashInput, nullifier)
 
 	credentialHash, err := poseidon.Hash(credHashInput)
 	if err != nil {
@@ -72,7 +57,7 @@ func (is *Issuer) IssueVotingClaim(
 			ID:                id,
 			IssuingAuthority:  issuingAuthority,
 			IsAdult:           isAdult,
-			DocumentNullifier: nullifierHash.String(),
+			DocumentNullifier: nullifier.String(),
 			CredentialHash:    credentialHash.String(),
 		},
 		Expiration:     expiration,
