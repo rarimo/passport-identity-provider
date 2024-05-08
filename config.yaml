@@ -12,6 +12,8 @@ verifier:
     sha256: "./sha256_verification_key.json"
   master_certs_path: "./masterList.dev.pem"
   allowed_age: 18
+  multi_acc_min_limit: 10
+  multi_acc_max_limit: 30
   registration_timeout: 1h
 
 issuer:

@@ -18,6 +18,8 @@ type VerifierConfig struct {
 	MasterCerts         []byte
 	AllowedAge          int
 	RegistrationTimeout time.Duration
+	MultiAccMinLimit    int
+	MultiAccMaxLimit    int
 }
 
 type verifier struct {
@@ -37,6 +39,8 @@ func (v *verifier) VerifierConfig() *VerifierConfig {
 			VerificationKeysPaths map[string]string `fig:"verification_keys_paths,required"`
 			MasterCertsPath       string            `fig:"master_certs_path,required"`
 			AllowedAge            int               `fig:"allowed_age,required"`
+			MultiAccMinLimit      int               `fig:"multi_acc_min_limit,required"`
+			MultiAccMaxLimit      int               `fig:"multi_acc_max_limit,required"`
 			RegistrationTimeout   time.Duration     `fig:"registration_timeout"`
 		}{}
 
@@ -68,6 +72,8 @@ func (v *verifier) VerifierConfig() *VerifierConfig {
 			VerificationKeys:    verificationKeys,
 			MasterCerts:         masterCerts,
 			AllowedAge:          newCfg.AllowedAge,
+			MultiAccMinLimit:    newCfg.MultiAccMinLimit,
+			MultiAccMaxLimit:    newCfg.MultiAccMaxLimit,
 			RegistrationTimeout: newCfg.RegistrationTimeout,
 		}
 	}).(*VerifierConfig)
