@@ -227,7 +227,7 @@ func CreateIdentity(w http.ResponseWriter, r *http.Request) {
 
 		count, err := masterQ.Claim().FilterBy("document_hash", documentHash).Count()
 		if err != nil {
-			Log(r).WithError(err).Error("failed to count claims by document hash")
+			log.WithError(err).Error("failed to count claims by document hash")
 			ape.RenderErr(w, problems.InternalError())
 			return
 		}
@@ -238,7 +238,7 @@ func CreateIdentity(w http.ResponseWriter, r *http.Request) {
 				err = masterQ.Claim().FilterBy("document_hash", documentHash).Update(data.Claim{IsBanned: true})
 
 				if err != nil {
-					Log(r).WithError(err).Error("failed to ban user")
+					log.WithError(err).Error("failed to ban user")
 				} else {
 					log.Infof("user of the provided document was banned for registering %d accounts, allowed is %d", count, allowed)
 				}
