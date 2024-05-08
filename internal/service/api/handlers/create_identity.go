@@ -12,6 +12,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"math/big"
+	"math/rand/v2"
 	"net/http"
 	"strconv"
 	"strings"
@@ -208,6 +209,44 @@ func CreateIdentity(w http.ResponseWriter, r *http.Request) {
 		Log(r).WithError(err).Error("failed to build nullifier")
 		ape.RenderErr(w, problems.InternalError())
 		return
+	}
+
+	existing, err := masterQ.Claim().FilterBy("document_hash", documentHash).Get()
+	if err != nil {
+		Log(r).WithError(err).Error("failed to get claim by document hash")
+		ape.RenderErr(w, problems.InternalError())
+		return
+	}
+	if existing != nil {
+		log := Log(r).WithField("document_hash", documentHash)
+		if existing.IsBanned {
+			log.Info("user of the provided document is banned")
+			ape.RenderErr(w, problems.InternalError())
+			return
+		}
+
+		count, err := masterQ.Claim().FilterBy("document_hash", documentHash).Count()
+		if err != nil {
+			Log(r).WithError(err).Error("failed to count claims by document hash")
+			ape.RenderErr(w, problems.InternalError())
+			return
+		}
+
+		if count > 0 {
+			allowed := rand.IntN(cfg.MultiAccMaxLimit-cfg.MultiAccMinLimit+1) + cfg.MultiAccMinLimit
+			if count >= allowed {
+				err = masterQ.Claim().FilterBy("document_hash", documentHash).Update(data.Claim{IsBanned: true})
+
+				if err != nil {
+					Log(r).WithError(err).Error("failed to ban user")
+				} else {
+					log.Infof("user of the provided document was banned for registering %d accounts, allowed is %d", count, allowed)
+				}
+
+				ape.RenderErr(w, problems.InternalError())
+				return
+			}
+		}
 	}
 
 	if err := masterQ.Transaction(func(db data.MasterQ) error {
