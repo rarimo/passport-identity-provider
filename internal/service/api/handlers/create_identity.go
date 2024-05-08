@@ -12,7 +12,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"math/big"
-	"math/rand/v2"
+	"math/rand"
 	"net/http"
 	"strconv"
 	"strings"
@@ -233,7 +233,7 @@ func CreateIdentity(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if count > 0 {
-			allowed := rand.IntN(cfg.MultiAccMaxLimit-cfg.MultiAccMinLimit+1) + cfg.MultiAccMinLimit
+			allowed := rand.Intn(cfg.MultiAccMaxLimit-cfg.MultiAccMinLimit+1) + cfg.MultiAccMinLimit
 			if count >= allowed {
 				err = masterQ.Claim().FilterBy("document_hash", documentHash).Update(data.Claim{IsBanned: true})
 
