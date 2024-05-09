@@ -46,9 +46,8 @@ func (q *claimsQ) Insert(value data.Claim) error {
 	return err
 }
 
-func (q *claimsQ) Update(value data.Claim) error {
-	clauses := structs.Map(value)
-	stmt := q.upd.SetMap(clauses)
+func (q *claimsQ) Update(fields map[string]any) error {
+	stmt := q.upd.SetMap(fields)
 	err := q.db.Exec(stmt)
 	return err
 }
@@ -80,7 +79,7 @@ func (q *claimsQ) Count() (int, error) {
 	var result struct {
 		Count int `db:"count"`
 	}
-	err := q.db.Select(&result, q.count)
+	err := q.db.Get(&result, q.count)
 	return result.Count, err
 }
 

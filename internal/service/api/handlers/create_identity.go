@@ -12,7 +12,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"math/big"
-	"math/rand/v2"
+	"math/rand"
 	"net/http"
 	"strconv"
 	"strings"
@@ -211,21 +211,21 @@ func CreateIdentity(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	existing, err := masterQ.Claim().FilterBy("document_hash", documentHash).Get()
+	existing, err := masterQ.Claim().FilterBy("document_hash", documentHash.String()).Get()
 	if err != nil {
 		Log(r).WithError(err).Error("failed to get claim by document hash")
 		ape.RenderErr(w, problems.InternalError())
 		return
 	}
 	if existing != nil {
-		log := Log(r).WithField("document_hash", documentHash)
+		log := Log(r).WithField("document_hash", documentHash.String())
 		if existing.IsBanned {
 			log.Info("user of the provided document is banned")
 			ape.RenderErr(w, problems.InternalError())
 			return
 		}
 
-		count, err := masterQ.Claim().FilterBy("document_hash", documentHash).Count()
+		count, err := masterQ.Claim().FilterBy("document_hash", documentHash.String()).Count()
 		if err != nil {
 			log.WithError(err).Error("failed to count claims by document hash")
 			ape.RenderErr(w, problems.InternalError())
@@ -233,9 +233,11 @@ func CreateIdentity(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if count > 0 {
-			allowed := rand.IntN(cfg.MultiAccMaxLimit-cfg.MultiAccMinLimit+1) + cfg.MultiAccMinLimit
+			allowed := rand.Intn(cfg.MultiAccMaxLimit-cfg.MultiAccMinLimit+1) + cfg.MultiAccMinLimit
 			if count >= allowed {
-				err = masterQ.Claim().FilterBy("document_hash", documentHash).Update(data.Claim{IsBanned: true})
+				err = masterQ.Claim().FilterBy("document_hash", documentHash.String()).Update(map[string]any{
+					"is_banned": true,
+				})
 
 				if err != nil {
 					log.WithError(err).Error("failed to ban user")
