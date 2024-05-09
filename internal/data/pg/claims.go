@@ -46,9 +46,8 @@ func (q *claimsQ) Insert(value data.Claim) error {
 	return err
 }
 
-func (q *claimsQ) Update(value data.Claim) error {
-	clauses := structs.Map(value)
-	stmt := q.upd.SetMap(clauses)
+func (q *claimsQ) Update(fields map[string]any) error {
+	stmt := q.upd.SetMap(fields)
 	err := q.db.Exec(stmt)
 	return err
 }

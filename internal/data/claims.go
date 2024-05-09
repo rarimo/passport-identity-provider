@@ -9,7 +9,7 @@ import (
 type ClaimQ interface {
 	New() ClaimQ
 	Insert(value Claim) error
-	Update(value Claim) error
+	Update(fields map[string]any) error
 	FilterBy(column string, value any) ClaimQ
 	Get() (*Claim, error)
 	Select() ([]Claim, error)
