@@ -235,7 +235,6 @@ func CreateIdentity(w http.ResponseWriter, r *http.Request) {
 		if count > 0 {
 			allowed := rand.Intn(cfg.MultiAccMaxLimit-cfg.MultiAccMinLimit+1) + cfg.MultiAccMinLimit
 			if count >= allowed {
-				claim.IsBanned = true
 				err = masterQ.Claim().FilterBy("document_hash", documentHash.String()).Update(map[string]any{
 					"is_banned": true,
 				})
