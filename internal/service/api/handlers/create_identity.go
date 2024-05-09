@@ -211,7 +211,7 @@ func CreateIdentity(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	existing, err := masterQ.Claim().FilterBy("document_hash", documentHash).Get()
+	existing, err := masterQ.Claim().FilterBy("document_hash", documentHash.String()).Get()
 	if err != nil {
 		Log(r).WithError(err).Error("failed to get claim by document hash")
 		ape.RenderErr(w, problems.InternalError())
