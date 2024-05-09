@@ -80,7 +80,7 @@ func (q *claimsQ) Count() (int, error) {
 	var result struct {
 		Count int `db:"count"`
 	}
-	err := q.db.Select(&result, q.count)
+	err := q.db.Get(&result, q.count)
 	return result.Count, err
 }
 
