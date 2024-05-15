@@ -129,7 +129,21 @@ func CreateIdentity(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := validatePubSignals(cfg, req.Data, encapsulatedData.PrivateKey.El1.OctetStr.Bytes); err != nil {
+	privateKey := make([]asn1.RawValue, 0)
+	if _, err = asn1.Unmarshal(encapsulatedData.PrivateKey.FullBytes, &privateKey); err != nil {
+		Log(r).WithError(err).Error("failed to unmarshal ASN.1")
+		ape.RenderErr(w, problems.InternalError())
+		return
+	}
+
+	privKeyEl := resources.PrivateKeyElement{}
+	if _, err = asn1.Unmarshal(privateKey[0].FullBytes, &privKeyEl); err != nil {
+		Log(r).WithError(err).Error("failed to unmarshal ASN.1")
+		ape.RenderErr(w, problems.InternalError())
+		return
+	}
+
+	if err := validatePubSignals(cfg, req.Data, privKeyEl.OctetStr.Bytes); err != nil {
 		Log(r).WithError(err).Error("failed to validate pub signals")
 		ape.RenderErr(w, problems.BadRequest(err)...)
 		return

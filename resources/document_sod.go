@@ -10,38 +10,10 @@ type DigestAttribute struct {
 type EncapsulatedData struct {
 	Version             int
 	PrivateKeyAlgorithm asn1.RawValue
-	PrivateKey          struct {
-		El1 struct {
-			Integer  int
-			OctetStr asn1.RawValue
-		}
-		El2 struct {
-			Integer  int
-			OctetStr asn1.RawValue
-		}
-		El3 struct {
-			Integer  int
-			OctetStr asn1.RawValue
-		}
-		El4 struct {
-			Integer  int
-			OctetStr asn1.RawValue
-		}
-		El5 struct {
-			Integer  int
-			OctetStr asn1.RawValue
-		}
-		El6 struct {
-			Integer  int
-			OctetStr asn1.RawValue
-		}
-		El7 struct {
-			Integer  int
-			OctetStr asn1.RawValue
-		}
-		El8 struct {
-			Integer  int
-			OctetStr asn1.RawValue
-		}
-	}
+	PrivateKey          asn1.RawValue
+}
+
+type PrivateKeyElement struct {
+	Integer  int
+	OctetStr asn1.RawValue
 }
