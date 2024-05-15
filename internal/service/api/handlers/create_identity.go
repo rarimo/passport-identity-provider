@@ -28,6 +28,7 @@ import (
 	"github.com/rarimo/passport-identity-provider/resources"
 	"gitlab.com/distributed_lab/ape"
 	"gitlab.com/distributed_lab/ape/problems"
+	"gitlab.com/distributed_lab/logan/v3"
 	"gitlab.com/distributed_lab/logan/v3/errors"
 )
 
@@ -357,7 +358,11 @@ func validateSignedAttributes(signedAttributes, encapsulatedContent []byte, algo
 	}
 
 	if !bytes.Equal(digestAttr.Digest[0].Bytes, d) {
-		return errors.New("digest signed attribute is not equal to encapsulated content hash")
+		return errors.From(errors.New("digest signed attribute is not equal to encapsulated content hash"), logan.F{
+			"signed_attributes":    hex.EncodeToString(digestAttr.Digest[0].Bytes),
+			"content_hash":         hex.EncodeToString(d),
+			"encapsulated_content": hex.EncodeToString(encapsulatedContent),
+		})
 	}
 	return nil
 }
