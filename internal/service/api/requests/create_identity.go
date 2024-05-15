@@ -2,10 +2,11 @@ package requests
 
 import (
 	"encoding/json"
+	"net/http"
+
 	"github.com/iden3/go-iden3-core/v2/w3c"
 	snarkTypes "github.com/iden3/go-rapidsnark/types"
 	"gitlab.com/distributed_lab/logan/v3/errors"
-	"net/http"
 )
 
 type CreateIdentityRequestData struct {
@@ -30,6 +31,10 @@ func NewCreateIdentityRequest(r *http.Request) (CreateIdentityRequest, error) {
 	err := json.NewDecoder(r.Body).Decode(&request)
 	if err != nil {
 		return request, errors.Wrap(err, "failed to unmarshal")
+	}
+
+	if request.Data.DocumentSOD.EncapsulatedContent[0:2] != "30" {
+		request.Data.DocumentSOD.EncapsulatedContent = "30" + request.Data.DocumentSOD.EncapsulatedContent
 	}
 
 	return request, nil
