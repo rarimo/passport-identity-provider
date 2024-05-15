@@ -359,8 +359,9 @@ func validateSignedAttributes(signedAttributes, encapsulatedContent []byte, algo
 
 	if !bytes.Equal(digestAttr.Digest[0].Bytes, d) {
 		return errors.From(errors.New("digest signed attribute is not equal to encapsulated content hash"), logan.F{
-			"signed_attributes": hex.EncodeToString(digestAttr.Digest[0].Bytes),
-			"content_hash":      hex.EncodeToString(d),
+			"signed_attributes":    hex.EncodeToString(digestAttr.Digest[0].Bytes),
+			"content_hash":         hex.EncodeToString(d),
+			"encapsulated_content": hex.EncodeToString(encapsulatedContent),
 		})
 	}
 	return nil
