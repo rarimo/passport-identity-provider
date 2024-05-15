@@ -1,6 +1,6 @@
 module github.com/rarimo/passport-identity-provider
 
-go 1.21.6
+go 1.20
 
 require (
 	github.com/Masterminds/squirrel v1.5.4
@@ -14,11 +14,15 @@ require (
 	github.com/iden3/contracts-abi/state/go/abi v1.0.1
 	github.com/iden3/go-iden3-core/v2 v2.0.4
 	github.com/iden3/go-iden3-crypto v0.0.16
+	github.com/iden3/go-rapidsnark/prover v0.0.10
 	github.com/iden3/go-rapidsnark/types v0.0.3
 	github.com/iden3/go-rapidsnark/verifier v0.0.5
+	github.com/iden3/go-rapidsnark/witness v0.0.6
 	github.com/imroc/req/v3 v3.43.1
 	github.com/rarimo/certificate-transparency-go v0.0.0-20240305114501-050b1f19639a
 	github.com/rubenv/sql-migrate v1.6.1
+	github.com/stretchr/testify v1.8.4
+	github.com/wealdtech/go-merkletree/v2 v2.6.0
 	gitlab.com/distributed_lab/ape v1.7.1
 	gitlab.com/distributed_lab/dig v0.0.0-20230207152643-c44f80a4294c
 	gitlab.com/distributed_lab/figure v2.1.2+incompatible
@@ -42,6 +46,7 @@ require (
 	github.com/consensys/bavard v0.1.13 // indirect
 	github.com/consensys/gnark-crypto v0.12.1 // indirect
 	github.com/crate-crypto/go-kzg-4844 v0.7.0 // indirect
+	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/deckarep/golang-set/v2 v2.1.0 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.0.1 // indirect
 	github.com/ethereum/c-kzg-4844 v0.4.0 // indirect
@@ -65,6 +70,7 @@ require (
 	github.com/hashicorp/go-sockaddr v1.0.2 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/holiman/uint256 v1.2.4 // indirect
+	github.com/iden3/wasmer-go v0.0.1 // indirect
 	github.com/jmoiron/sqlx v1.3.5 // indirect
 	github.com/keybase/go-crypto v0.0.0-20200123153347-de78d2cb44f4 // indirect
 	github.com/klauspost/compress v1.17.7 // indirect
@@ -80,6 +86,7 @@ require (
 	github.com/onsi/ginkgo/v2 v2.16.0 // indirect
 	github.com/pelletier/go-toml/v2 v2.1.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
+	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/quic-go/qpack v0.4.0 // indirect
 	github.com/quic-go/quic-go v0.41.0 // indirect
 	github.com/refraction-networking/utls v1.6.3 // indirect
@@ -101,13 +108,13 @@ require (
 	gitlab.com/distributed_lab/running v1.6.0 // indirect
 	go.uber.org/mock v0.4.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	golang.org/x/crypto v0.21.0 // indirect
+	golang.org/x/crypto v0.23.0 // indirect
 	golang.org/x/exp v0.0.0-20240222234643-814bf88cf225 // indirect
 	golang.org/x/mod v0.16.0 // indirect
 	golang.org/x/net v0.22.0 // indirect
 	golang.org/x/sync v0.6.0 // indirect
-	golang.org/x/sys v0.18.0 // indirect
-	golang.org/x/text v0.14.0 // indirect
+	golang.org/x/sys v0.20.0 // indirect
+	golang.org/x/text v0.15.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
 	golang.org/x/tools v0.19.0 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
