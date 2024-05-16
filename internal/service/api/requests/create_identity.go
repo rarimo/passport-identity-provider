@@ -2,10 +2,11 @@ package requests
 
 import (
 	"encoding/json"
+	"net/http"
+
 	"github.com/iden3/go-iden3-core/v2/w3c"
 	snarkTypes "github.com/iden3/go-rapidsnark/types"
 	"gitlab.com/distributed_lab/logan/v3/errors"
-	"net/http"
 )
 
 type CreateIdentityRequestData struct {
