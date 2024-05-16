@@ -13,6 +13,7 @@ import (
 	"github.com/rarimo/passport-identity-provider/resources"
 	"gitlab.com/distributed_lab/ape"
 	"gitlab.com/distributed_lab/ape/problems"
+	"gitlab.com/distributed_lab/logan/v3"
 )
 
 func GetGistData(w http.ResponseWriter, r *http.Request) {
@@ -61,6 +62,13 @@ func GetGistData(w http.ResponseWriter, r *http.Request) {
 		Log(r).WithError(err).Error("failed to get GIST root")
 		ape.RenderErr(w, problems.InternalError())
 		return
+	}
+
+	if gistProof.Root.Cmp(gistRoot) != 0 {
+		Log(r).WithFields(logan.F{
+			"gist_root":       gistRoot.String(),
+			"gist_proof_root": gistProof.Root.String(),
+		}).Warn("gist root does not match")
 	}
 
 	response := newGistDataResponse(req.UserDID, gistProof, gistRoot)
