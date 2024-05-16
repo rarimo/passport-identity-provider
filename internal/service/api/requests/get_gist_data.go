@@ -8,7 +8,8 @@ import (
 )
 
 type GetGistDataRequest struct {
-	UserDID string `url:"user_did"`
+	UserDID     string `url:"user_did"`
+	BlockNumber uint64 `url:"block_number"`
 }
 
 func NewGetGistDataRequest(r *http.Request) (GetGistDataRequest, error) {

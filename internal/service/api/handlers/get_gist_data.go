@@ -2,6 +2,9 @@ package handlers
 
 import (
 	"context"
+	validation "github.com/go-ozzo/ozzo-validation/v4"
+	"gitlab.com/distributed_lab/logan/v3"
+	"gitlab.com/distributed_lab/logan/v3/errors"
 	"math/big"
 	"net/http"
 
@@ -42,6 +45,21 @@ func GetGistData(w http.ResponseWriter, r *http.Request) {
 		Log(r).WithError(err).Error("failed to get block number")
 		ape.RenderErr(w, problems.InternalError())
 		return
+	}
+
+	if req.BlockNumber > blockNum {
+		Log(r).WithFields(logan.F{
+			"requested_block_number": req.BlockNumber,
+			"latest_block_number":    blockNum,
+		}).Error("Requested block number is higher than latest")
+		ape.RenderErr(w, problems.BadRequest(validation.Errors{
+			"/block_number": errors.New("Requested block number is higher than latest"),
+		})...)
+		return
+	}
+
+	if req.BlockNumber != 0 {
+		blockNum = req.BlockNumber
 	}
 
 	stateContract := StateContract(r)
