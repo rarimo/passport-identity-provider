@@ -33,5 +33,9 @@ func NewCreateIdentityRequest(r *http.Request) (CreateIdentityRequest, error) {
 		return request, errors.Wrap(err, "failed to unmarshal")
 	}
 
+	if request.Data.DocumentSOD.EncapsulatedContent[0:2] != "30" {
+		request.Data.DocumentSOD.EncapsulatedContent = "30" + request.Data.DocumentSOD.EncapsulatedContent
+	}
+
 	return request, nil
 }
