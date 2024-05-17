@@ -27,7 +27,7 @@ func GetGistData(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	gistProof, err := StateContract(r).GetGISTProofByRoot(&bind.CallOpts{}, req.StateRoot, userID.BigInt())
+	gistProof, err := StateContract(r).GetGISTProofByRoot(&bind.CallOpts{}, userID.BigInt(), req.StateRoot)
 	if err != nil {
 		Log(r).WithError(err).Error("failed to get GIST proof")
 		ape.RenderErr(w, problems.InternalError())
