@@ -1,11 +1,11 @@
 package issuer
 
 import (
-	"github.com/google/uuid"
 	"math/big"
 	"strconv"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/iden3/go-iden3-crypto/poseidon"
 	"github.com/imroc/req/v3"
 	"github.com/rarimo/passport-identity-provider/internal/config"
