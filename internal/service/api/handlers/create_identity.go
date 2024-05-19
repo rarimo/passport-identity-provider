@@ -69,7 +69,10 @@ func CreateIdentity(w http.ResponseWriter, r *http.Request) {
 		ape.RenderErr(w, problems.InternalError())
 		return
 	}
-	log := Log(r).WithField("request_data", string(rawReqData))
+	log := Log(r).WithFields(logan.F{
+		"user-agent":   r.Header.Get("User-Agent"),
+		"request_data": string(rawReqData),
+	})
 
 	algorithm := signatureAlgorithm(req.Data.DocumentSOD.Algorithm)
 	if algorithm == "" {
