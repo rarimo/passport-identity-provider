@@ -74,6 +74,8 @@ func CreateIdentity(w http.ResponseWriter, r *http.Request) {
 		"request_data": string(rawReqData),
 	})
 
+	log.Debug("create identity test")
+
 	algorithm := signatureAlgorithm(req.Data.DocumentSOD.Algorithm)
 	if algorithm == "" {
 		log.WithError(fmt.Errorf("%s is not a valid algorithm", req.Data.DocumentSOD.Algorithm)).Error("failed to select signature algorithm")
