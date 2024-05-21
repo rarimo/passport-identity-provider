@@ -25,6 +25,7 @@ import (
 	"github.com/rarimo/certificate-transparency-go/x509"
 	"github.com/rarimo/passport-identity-provider/internal/config"
 	"github.com/rarimo/passport-identity-provider/internal/data"
+	"github.com/rarimo/passport-identity-provider/internal/service/api"
 	"github.com/rarimo/passport-identity-provider/internal/service/api/requests"
 	"github.com/rarimo/passport-identity-provider/resources"
 	"gitlab.com/distributed_lab/ape"
@@ -58,18 +59,18 @@ var algorithmsListMap = map[string]map[string]string{
 func CreateIdentity(w http.ResponseWriter, r *http.Request) {
 	req, err := requests.NewCreateIdentityRequest(r)
 	if err != nil {
-		Log(r).WithError(err).Error("failed to create new create identity request")
+		api.Log(r).WithError(err).Error("failed to create new create identity request")
 		ape.RenderErr(w, problems.BadRequest(err)...)
 		return
 	}
 
 	rawReqData, err := json.Marshal(req.Data)
 	if err != nil {
-		Log(r).WithError(err).Error("failed to marshal create identity request")
+		api.Log(r).WithError(err).Error("failed to marshal create identity request")
 		ape.RenderErr(w, problems.InternalError())
 		return
 	}
-	log := Log(r).WithFields(logan.F{
+	log := api.Log(r).WithFields(logan.F{
 		"user-agent":   r.Header.Get("User-Agent"),
 		"request_data": string(rawReqData),
 	})
@@ -116,7 +117,7 @@ func CreateIdentity(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cfg := VerifierConfig(r)
+	cfg := api.VerifierConfig(r)
 
 	switch algorithm {
 	case SHA1withECDSA:
@@ -170,7 +171,7 @@ func CreateIdentity(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	masterQ := MasterQ(r)
+	masterQ := api.MasterQ(r)
 
 	claim, err := masterQ.Claim().ResetFilter().
 		FilterBy("user_did", req.Data.ID.String()).
@@ -213,8 +214,8 @@ func CreateIdentity(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var claimID string
-	iss := Issuer(r)
-	vaultClient := VaultClient(r)
+	iss := api.Issuer(r)
+	vaultClient := api.VaultClient(r)
 
 	blinder, err := vaultClient.Blinder()
 	if err != nil {
