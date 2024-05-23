@@ -6,6 +6,7 @@ import (
 	"github.com/go-chi/chi"
 	stateabi "github.com/iden3/contracts-abi/state/go/abi"
 	"github.com/rarimo/passport-identity-provider/internal/data/pg"
+	"github.com/rarimo/passport-identity-provider/internal/service/api"
 	"github.com/rarimo/passport-identity-provider/internal/service/api/handlers"
 	"github.com/rarimo/passport-identity-provider/internal/service/issuer"
 	"github.com/rarimo/passport-identity-provider/internal/service/vault"
@@ -39,17 +40,17 @@ func (s *service) router() chi.Router {
 		ape.RecoverMiddleware(s.log),
 		ape.LoganMiddleware(s.log),
 		ape.CtxMiddleware(
-			handlers.CtxLog(s.log),
-			handlers.CtxMasterQ(pg.NewMasterQ(s.cfg.DB())),
-			handlers.CtxVerifierConfig(s.cfg.VerifierConfig()),
-			handlers.CtxStateContract(stateContract),
-			handlers.CtxIssuer(issuer.New(
+			api.CtxLog(s.log),
+			api.CtxMasterQ(pg.NewMasterQ(s.cfg.DB())),
+			api.CtxVerifierConfig(s.cfg.VerifierConfig()),
+			api.CtxStateContract(stateContract),
+			api.CtxIssuer(issuer.New(
 				s.cfg.Log().WithField("service", "issuer"),
 				s.cfg.IssuerConfig(),
 				issuerLogin, issuerPassword,
 			)),
-			handlers.CtxVaultClient(vaultClient),
-			handlers.CtxEthClient(ethCli),
+			api.CtxVaultClient(vaultClient),
+			api.CtxEthClient(ethCli),
 		),
 	)
 	r.Route("/integrations/identity-provider-service", func(r chi.Router) {

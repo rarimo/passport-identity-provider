@@ -10,6 +10,7 @@ import (
 	"github.com/iden3/contracts-abi/state/go/abi"
 	core "github.com/iden3/go-iden3-core/v2"
 	"github.com/iden3/go-iden3-core/v2/w3c"
+	"github.com/rarimo/passport-identity-provider/internal/service/api"
 	"github.com/rarimo/passport-identity-provider/internal/service/api/requests"
 	"github.com/rarimo/passport-identity-provider/resources"
 	"gitlab.com/distributed_lab/ape"
@@ -21,12 +22,12 @@ import (
 func GetGistData(w http.ResponseWriter, r *http.Request) {
 	req, err := requests.NewGetGistDataRequest(r)
 	if err != nil {
-		Log(r).WithError(err).Error("failed to parse get gist data request")
+		api.Log(r).WithError(err).Error("failed to parse get gist data request")
 		ape.RenderErr(w, problems.BadRequest(err)...)
 		return
 	}
 
-	log := Log(r).WithFields(logan.F{
+	log := api.Log(r).WithFields(logan.F{
 		"user-agent":   r.Header.Get("User-Agent"),
 		"user_did":     req.UserDID,
 		"block_number": req.BlockNumber,
@@ -46,7 +47,7 @@ func GetGistData(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	blockNum, err := EthClient(r).BlockNumber(context.Background())
+	blockNum, err := api.EthClient(r).BlockNumber(context.Background())
 	if err != nil {
 		log.WithError(err).Error("failed to get block number")
 		ape.RenderErr(w, problems.InternalError())
@@ -67,7 +68,7 @@ func GetGistData(w http.ResponseWriter, r *http.Request) {
 		blockNum = req.BlockNumber
 	}
 
-	stateContract := StateContract(r)
+	stateContract := api.StateContract(r)
 
 	gistProof, err := stateContract.GetGISTProof(&bind.CallOpts{
 		BlockNumber: new(big.Int).SetUint64(blockNum),

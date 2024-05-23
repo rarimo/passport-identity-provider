@@ -1,7 +1,9 @@
-package handlers
+package api
 
 import (
 	"context"
+	"net/http"
+
 	"github.com/ethereum/go-ethereum/ethclient"
 	stateabi "github.com/iden3/contracts-abi/state/go/abi"
 	"github.com/rarimo/passport-identity-provider/internal/config"
@@ -9,7 +11,6 @@ import (
 	"github.com/rarimo/passport-identity-provider/internal/service/issuer"
 	"github.com/rarimo/passport-identity-provider/internal/service/vault"
 	"gitlab.com/distributed_lab/logan/v3"
-	"net/http"
 )
 
 type ctxKey int
