@@ -10,6 +10,7 @@ import (
 	"github.com/rarimo/passport-identity-provider/internal/service/api/handlers"
 	"github.com/rarimo/passport-identity-provider/internal/service/issuer"
 	"github.com/rarimo/passport-identity-provider/internal/service/vault"
+	"github.com/rarimo/passport-identity-provider/internal/zknullifiers"
 	"gitlab.com/distributed_lab/ape"
 )
 
@@ -34,6 +35,11 @@ func (s *service) router() chi.Router {
 		s.log.WithError(err).Fatal("failed to get issuer auth data from the vault")
 	}
 
+	nullifiersProver, err := zknullifiers.New(s.cfg.Log())
+	if err != nil {
+		s.log.WithError(err).Fatal("failed to create nullifiers prover instance")
+	}
+
 	r := chi.NewRouter()
 
 	r.Use(
@@ -49,14 +55,18 @@ func (s *service) router() chi.Router {
 				s.cfg.IssuerConfig(),
 				issuerLogin, issuerPassword,
 			)),
+			api.CtxNullifiersProver(nullifiersProver),
 			api.CtxVaultClient(vaultClient),
 			api.CtxEthClient(ethCli),
+			api.CtxProverCfg(s.cfg.ProverConfig()),
 		),
 	)
 	r.Route("/integrations/identity-provider-service", func(r chi.Router) {
 		r.Route("/v1", func(r chi.Router) {
 			r.Post("/create-identity", handlers.CreateIdentity)
 			r.Get("/gist-data", handlers.GetGistData)
+
+			r.Get("/uniqueness-proof", handlers.GetUniquenessProofs)
 		})
 	})
 
