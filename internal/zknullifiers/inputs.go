@@ -2,12 +2,12 @@ package zknullifiers
 
 import (
 	"encoding/json"
+	"math"
 	"math/big"
 
 	"github.com/iden3/go-iden3-crypto/poseidon"
 	"github.com/iden3/go-rapidsnark/witness"
 	"github.com/wealdtech/go-merkletree/v2"
-	mtposeidon "github.com/wealdtech/go-merkletree/v2/poseidon"
 	"gitlab.com/distributed_lab/logan/v3/errors"
 )
 
@@ -25,10 +25,15 @@ type MtProof struct {
 	Orders   []string
 }
 
-func CreateInputs(blinder, documentHash *big.Int, salts []*big.Int) (map[string]interface{}, error) {
-	leaves := make([][]byte, len(salts))
-	for i, salt := range salts {
-		nullifier, err := poseidon.Hash([]*big.Int{documentHash, blinder, salt})
+func CreateInputs(nullifiersCount, treeDepth int, blinder, documentHash *big.Int, salts []*big.Int) (map[string]interface{}, error) {
+	leaves := make([][]byte, nullifiersCount)
+	for i := 0; i < nullifiersCount; i++ {
+		if i > len(salts)-1 {
+			leaves[i] = []byte{0}
+			continue
+		}
+
+		nullifier, err := poseidon.Hash([]*big.Int{documentHash, blinder, salts[i]})
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to create nullifier")
 		}
@@ -36,7 +41,7 @@ func CreateInputs(blinder, documentHash *big.Int, salts []*big.Int) (map[string]
 		leaves[i] = nullifier.Bytes()
 	}
 
-	root, proofs, err := getMTProofs(leaves)
+	root, proofs, err := getMTProofs(treeDepth, leaves)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get merkle proofs")
 	}
@@ -45,15 +50,21 @@ func CreateInputs(blinder, documentHash *big.Int, salts []*big.Int) (map[string]
 		Root:           root,
 		Blinder:        blinder.String(),
 		DocumentHash:   documentHash.String(),
-		Salt:           make([]string, len(proofs)),
-		ProofsBranches: make([][]string, len(proofs)),
-		ProofsOrder:    make([][]string, len(proofs)),
+		Salt:           make([]string, nullifiersCount),
+		ProofsBranches: make([][]string, nullifiersCount),
+		ProofsOrder:    make([][]string, nullifiersCount),
 	}
 
 	for i, proof := range proofs {
-		inputs.Salt[i] = salts[i].String()
 		inputs.ProofsBranches[i] = proof.Siblings
 		inputs.ProofsOrder[i] = proof.Orders
+
+		if i > len(salts)-1 {
+			inputs.Salt[i] = "0"
+			continue
+		}
+
+		inputs.Salt[i] = salts[i].String()
 	}
 
 	rawInputs, err := json.Marshal(inputs)
@@ -64,48 +75,56 @@ func CreateInputs(blinder, documentHash *big.Int, salts []*big.Int) (map[string]
 	return witness.ParseInputs(rawInputs)
 }
 
-func getMTProofs(leaves [][]byte) (string, []MtProof, error) {
-	tree, err := merkletree.NewTree(merkletree.WithData(leaves), merkletree.WithHashType(mtposeidon.New()))
+func getMTProofs(treeDepth int, leaves [][]byte) (string, []MtProof, error) {
+	oldLength := len(leaves)
+
+	// crunch to build fixed-sized tree by filling extra values with zeroes
+	dataAmount := int(math.Pow(2, float64(treeDepth)))
+	for i := len(leaves); i < dataAmount; i++ {
+		leaves = append(leaves, []byte{0})
+	}
+
+	tree, err := merkletree.NewTree(merkletree.WithData(leaves), merkletree.WithHashType(NewPoseidon()))
 	if err != nil {
 		return "", nil, errors.Wrap(err, "failed to create merkle tree")
 	}
 
-	proofs := make([]MtProof, len(leaves))
+	proofs := make([]MtProof, oldLength)
 
-	for i, leaf := range leaves {
-		res := MtProof{}
-
-		proof, err := tree.GenerateProof(leaf, 0)
+	for i := 0; i < oldLength; i++ {
+		proof, err := tree.GenerateProof(leaves[i], 0)
 		if err != nil {
 			return "", nil, errors.Wrap(err, "failed to generate merkle tree proof")
 		}
 
-		for _, hash := range proof.Hashes {
-			res.Siblings = append(res.Siblings, new(big.Int).SetBytes(hash).String())
-		}
-		res.Orders = buildOrders(leaf, proof, mtposeidon.New())
-
-		proofs[i] = res
+		proofs[i] = buildBranch(leaves[i], proof)
 	}
 
 	return new(big.Int).SetBytes(tree.Root()).String(), proofs, nil
 }
 
-func buildOrders(data []byte, proof *merkletree.Proof, hashType merkletree.HashType) []string {
-	resp := make([]string, len(proof.Hashes))
-	var proofHash = data
-	index := proof.Index + (1 << uint(len(proof.Hashes)))
+func buildBranch(leaf []byte, proof *merkletree.Proof) MtProof {
+	var (
+		branch    MtProof
+		hasher    = NewPoseidon()
+		proofHash = hasher.Hash(leaf)
+		index     = proof.Index + (1 << uint(len(proof.Hashes)))
+	)
 
-	for i, hash := range proof.Hashes {
+	for k := 0; k < len(proof.Hashes); k++ {
+		branch.Siblings = append(branch.Siblings, new(big.Int).SetBytes(proof.Hashes[k]).String())
+
 		if index%2 == 0 {
-			proofHash = hashType.Hash(proofHash, hash)
-			resp[i] = "0"
-		} else {
-			proofHash = hashType.Hash(hash, proofHash)
-			resp[i] = "1"
+			proofHash = hasher.Hash(proofHash, proof.Hashes[k])
+			branch.Orders = append(branch.Orders, "0")
+			index >>= 1
+			continue
 		}
+
+		proofHash = hasher.Hash(proof.Hashes[k], proofHash)
+		branch.Orders = append(branch.Orders, "1")
 		index >>= 1
 	}
 
-	return resp
+	return branch
 }

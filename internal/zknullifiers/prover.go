@@ -1,7 +1,7 @@
 package zknullifiers
 
 import (
-	"os"
+	"embed"
 
 	"github.com/iden3/go-rapidsnark/prover"
 	"github.com/iden3/go-rapidsnark/types"
@@ -17,22 +17,29 @@ const (
 	verificationKeyFilePath = "assets/nullifiers_counter_verification_key.json"
 )
 
+//go:embed assets/*
+var ZKAssets embed.FS
+
 type Prover interface {
 	GenerateZKProof(inputs map[string]interface{}) (*types.ZKProof, error)
 	VerifyZKProof(proof types.ZKProof) error
 }
 
 type nullifiersProver struct {
+	log             *logan.Entry
 	calculator      *witness.Circom2WitnessCalculator
 	zkey            []byte
 	verificationKey []byte
 }
 
-func New() (Prover, error) {
-	var zkProver nullifiersProver
+func New(logger *logan.Entry) (Prover, error) {
+	var zkProver = nullifiersProver{
+		log: logger,
+	}
+
 	var err error
 
-	wasmBytes, err := os.ReadFile(wasmFilePath)
+	wasmBytes, err := ZKAssets.ReadFile(wasmFilePath)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to read WASM file", logan.F{
 			"file": wasmFilePath,
@@ -44,14 +51,14 @@ func New() (Prover, error) {
 		return nil, errors.Wrap(err, "failed to create witness calculator")
 	}
 
-	zkProver.zkey, err = os.ReadFile(zkeyFilePath)
+	zkProver.zkey, err = ZKAssets.ReadFile(zkeyFilePath)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to read zkey file", logan.F{
 			"file": zkeyFilePath,
 		})
 	}
 
-	zkProver.verificationKey, err = os.ReadFile(verificationKeyFilePath)
+	zkProver.verificationKey, err = ZKAssets.ReadFile(verificationKeyFilePath)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to read verification key file", logan.F{
 			"file": verificationKeyFilePath,
@@ -67,10 +74,14 @@ func (np *nullifiersProver) GenerateZKProof(inputs map[string]interface{}) (*typ
 		return nil, errors.Wrap(err, "failed to calculate binary witness")
 	}
 
+	np.log.Debug("start proof generation process")
+
 	proof, err := prover.Groth16Prover(np.zkey, binaryWitness)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create zk proof")
 	}
+
+	np.log.Debug("start proof verification process")
 
 	if err = np.VerifyZKProof(*proof); err != nil {
 		return nil, errors.Wrap(err, "failed to verify zk proof")
