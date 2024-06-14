@@ -16,6 +16,10 @@ verifier:
   multi_acc_max_limit: 30
   registration_timeout: 1h
 
+prover:
+  nullifiers_count: 100
+  tree_depth: 15
+
 issuer:
   base_url: "http://localhost:3002/v1"
   did: ""

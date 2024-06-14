@@ -10,6 +10,7 @@ import (
 	"github.com/rarimo/passport-identity-provider/internal/data"
 	"github.com/rarimo/passport-identity-provider/internal/service/issuer"
 	"github.com/rarimo/passport-identity-provider/internal/service/vault"
+	"github.com/rarimo/passport-identity-provider/internal/zknullifiers"
 	"gitlab.com/distributed_lab/logan/v3"
 )
 
@@ -23,6 +24,8 @@ const (
 	issuerCtxKey
 	vaultClientCtxKey
 	ethClientCtxKey
+	proverCfgCtxKey
+	zkProverCtxKey
 )
 
 func CtxLog(entry *logan.Entry) func(context.Context) context.Context {
@@ -91,6 +94,26 @@ func CtxEthClient(client *ethclient.Client) func(context.Context) context.Contex
 	}
 }
 
+func CtxNullifiersProver(entry zknullifiers.Prover) func(context.Context) context.Context {
+	return func(ctx context.Context) context.Context {
+		return context.WithValue(ctx, zkProverCtxKey, entry)
+	}
+}
+
+func NullifiersProver(r *http.Request) zknullifiers.Prover {
+	return r.Context().Value(zkProverCtxKey).(zknullifiers.Prover)
+}
+
 func EthClient(r *http.Request) *ethclient.Client {
 	return r.Context().Value(ethClientCtxKey).(*ethclient.Client)
+}
+
+func CtxProverCfg(entry *config.ProverConfig) func(context.Context) context.Context {
+	return func(ctx context.Context) context.Context {
+		return context.WithValue(ctx, proverCfgCtxKey, entry)
+	}
+}
+
+func ProverCfg(r *http.Request) *config.ProverConfig {
+	return r.Context().Value(proverCfgCtxKey).(*config.ProverConfig)
 }

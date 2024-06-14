@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"gitlab.com/distributed_lab/kit/pgdb"
 )
 
 type ClaimQ interface {
@@ -11,10 +12,13 @@ type ClaimQ interface {
 	Insert(value Claim) error
 	Update(fields map[string]any) error
 	FilterBy(column string, value any) ClaimQ
+	DistinctOn(column string) ClaimQ
 	Get() (*Claim, error)
 	Select() ([]Claim, error)
 	Count() (int, error)
 	DeleteByID(id uuid.UUID) error
+	GroupBy(columns ...string) ClaimQ
+	Page(pageParams pgdb.OffsetPageParams, column string) ClaimQ
 	ForUpdate() ClaimQ
 	ResetFilter() ClaimQ
 }

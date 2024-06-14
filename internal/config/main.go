@@ -18,6 +18,7 @@ type Config interface {
 	VerifierConfiger
 	NetworkConfiger
 	VaultConfiger
+	ProverConfiger
 }
 
 type config struct {
@@ -31,6 +32,7 @@ type config struct {
 	VerifierConfiger
 	NetworkConfiger
 	VaultConfiger
+	ProverConfiger
 }
 
 func New(getter kv.Getter) Config {
@@ -44,5 +46,6 @@ func New(getter kv.Getter) Config {
 		VerifierConfiger: NewVerifierConfiger(getter),
 		NetworkConfiger:  NewNetworkConfiger(getter),
 		VaultConfiger:    NewVaultConfiger(getter),
+		ProverConfiger:   NewProverConfiger(getter),
 	}
 }
