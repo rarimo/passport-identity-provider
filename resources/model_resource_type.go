@@ -8,6 +8,7 @@ type ResourceType string
 
 // List of ResourceType
 const (
-	CLAIMS     ResourceType = "claims"
-	GIST_DATAS ResourceType = "gist_datas"
+	CLAIMS           ResourceType = "claims"
+	GIST_DATAS       ResourceType = "gist_datas"
+	UNIQUENESS_PROOF ResourceType = "uniqueness_proof"
 )

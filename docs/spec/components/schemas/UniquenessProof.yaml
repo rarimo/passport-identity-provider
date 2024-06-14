@@ -1,0 +1,15 @@
+allOf:
+  - $ref: '#/components/schemas/UniquenessKey'
+  - type: object
+    required:
+      - attributes
+    properties:
+      attributes:
+        type: object
+        required:
+          - proof
+        properties:
+          proof:
+            type: object
+            format: "*types.ZKProof"
+            description: ZK-proof for the nullifier counter

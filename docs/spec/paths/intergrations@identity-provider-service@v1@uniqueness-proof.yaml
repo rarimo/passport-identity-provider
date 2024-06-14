@@ -1,0 +1,41 @@
+get:
+  tags:
+    - Uniqueness proof
+  summary: Get uniqueness proof
+  operationId: GetUniquenessProof
+  parameters:
+    - in: query
+      name: page[limit]
+      required: false
+      schema:
+        type: integer
+        format: int64
+    - in: query
+      name: page[number]
+      required: false
+      schema:
+        type: integer
+        format: int64
+  responses:
+    '200':
+      description: Success
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              data:
+                type: object
+                $ref: '#/components/schemas/UniquenessProof'
+    '500':
+      description: Internal Error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Errors'
+    '400':
+      description: Bad Request Error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Errors'
