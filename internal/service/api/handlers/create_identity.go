@@ -9,6 +9,7 @@ import (
 	"crypto/sha256"
 	"encoding/asn1"
 	"encoding/hex"
+	"encoding/json"
 	"encoding/pem"
 	"fmt"
 	"math/big"
@@ -24,10 +25,12 @@ import (
 	"github.com/rarimo/certificate-transparency-go/x509"
 	"github.com/rarimo/passport-identity-provider/internal/config"
 	"github.com/rarimo/passport-identity-provider/internal/data"
+	"github.com/rarimo/passport-identity-provider/internal/service/api"
 	"github.com/rarimo/passport-identity-provider/internal/service/api/requests"
 	"github.com/rarimo/passport-identity-provider/resources"
 	"gitlab.com/distributed_lab/ape"
 	"gitlab.com/distributed_lab/ape/problems"
+	"gitlab.com/distributed_lab/logan/v3"
 	"gitlab.com/distributed_lab/logan/v3/errors"
 )
 
@@ -56,98 +59,125 @@ var algorithmsListMap = map[string]map[string]string{
 func CreateIdentity(w http.ResponseWriter, r *http.Request) {
 	req, err := requests.NewCreateIdentityRequest(r)
 	if err != nil {
-		Log(r).WithError(err).Error("failed to create new create identity request")
+		api.Log(r).WithError(err).Error("failed to create new create identity request")
 		ape.RenderErr(w, problems.BadRequest(err)...)
 		return
 	}
 
+	rawReqData, err := json.Marshal(req.Data)
+	if err != nil {
+		api.Log(r).WithError(err).Error("failed to marshal create identity request")
+		ape.RenderErr(w, problems.InternalError())
+		return
+	}
+	log := api.Log(r).WithFields(logan.F{
+		"user-agent":   r.Header.Get("User-Agent"),
+		"request_data": string(rawReqData),
+	})
+
+	log.Debug("created identity request")
+
 	algorithm := signatureAlgorithm(req.Data.DocumentSOD.Algorithm)
 	if algorithm == "" {
-		Log(r).WithError(fmt.Errorf("%s is not a valid algorithm", req.Data.DocumentSOD.Algorithm)).Error("failed to select signature algorithm")
+		log.WithError(fmt.Errorf("%s is not a valid algorithm", req.Data.DocumentSOD.Algorithm)).Error("failed to select signature algorithm")
 		ape.RenderErr(w, problems.BadRequest(fmt.Errorf("%s is not a valid algorithm", req.Data.DocumentSOD.Algorithm))...)
 		return
 	}
 
 	signedAttributes, err := hex.DecodeString(req.Data.DocumentSOD.SignedAttributes)
 	if err != nil {
-		Log(r).WithError(err).Error("failed to decode hex string")
+		log.WithError(err).Error("failed to decode hex string")
 		ape.RenderErr(w, problems.BadRequest(err)...)
 		return
 	}
 
 	encapsulatedContent, err := hex.DecodeString(req.Data.DocumentSOD.EncapsulatedContent)
 	if err != nil {
-		Log(r).WithError(err).Error("failed to decode hex string")
+		log.WithError(err).Error("failed to decode hex string")
 		ape.RenderErr(w, problems.BadRequest(err)...)
 		return
 	}
 
 	if err := validateSignedAttributes(signedAttributes, encapsulatedContent, algorithm); err != nil {
-		Log(r).WithError(err).Error("failed to validate signed attributes")
+		log.WithError(err).Error("failed to validate signed attributes")
 		ape.RenderErr(w, problems.InternalError())
 		return
 	}
 
 	cert, err := parseCertificate([]byte(req.Data.DocumentSOD.PemFile))
 	if err != nil {
-		Log(r).WithError(err).Error("failed to parse certificate")
+		log.WithError(err).Error("failed to parse certificate")
 		ape.RenderErr(w, problems.InternalError())
 		return
 	}
 
 	if err := verifySignature(req, cert, signedAttributes, algorithm); err != nil {
-		Log(r).WithError(err).Error("failed to verify signature")
+		log.WithError(err).Error("failed to verify signature")
 		ape.RenderErr(w, problems.InternalError())
 		return
 	}
 
-	cfg := VerifierConfig(r)
+	cfg := api.VerifierConfig(r)
 
 	switch algorithm {
 	case SHA1withECDSA:
 		if err := verifier.VerifyGroth16(req.Data.ZKProof, cfg.VerificationKeys[SHA1]); err != nil {
-			Log(r).WithError(err).Error("failed to verify Groth16")
+			log.WithError(err).Error("failed to verify Groth16")
 			ape.RenderErr(w, problems.BadRequest(err)...)
 			return
 		}
 	case SHA256withRSA, SHA256withECDSA:
 		if err := verifier.VerifyGroth16(req.Data.ZKProof, cfg.VerificationKeys[SHA256]); err != nil {
-			Log(r).WithError(err).Error("failed to verify Groth16")
+			log.WithError(err).Error("failed to verify Groth16")
 			ape.RenderErr(w, problems.BadRequest(err)...)
 			return
 		}
 	default:
-		Log(r).WithField("algorithm", req.Data.DocumentSOD.Algorithm).Debug("invalid signature algorithm")
+		log.WithField("algorithm", req.Data.DocumentSOD.Algorithm).Debug("invalid signature algorithm")
 		ape.RenderErr(w, problems.BadRequest(errors.New("invalid signature algorithm"))...)
 		return
 	}
 
 	encapsulatedData := resources.EncapsulatedData{}
 	if _, err = asn1.Unmarshal(encapsulatedContent, &encapsulatedData); err != nil {
-		Log(r).WithError(err).Error("failed to unmarshal ASN.1")
+		log.WithError(err).Error("failed to unmarshal ASN.1")
 		ape.RenderErr(w, problems.InternalError())
 		return
 	}
 
-	if err := validatePubSignals(cfg, req.Data, encapsulatedData.PrivateKey.El1.OctetStr.Bytes); err != nil {
-		Log(r).WithError(err).Error("failed to validate pub signals")
+	privateKey := make([]asn1.RawValue, 0)
+	if _, err = asn1.Unmarshal(encapsulatedData.PrivateKey.FullBytes, &privateKey); err != nil {
+		log.WithError(err).Error("failed to unmarshal ASN.1")
+		ape.RenderErr(w, problems.InternalError())
+		return
+	}
+
+	privKeyEl := resources.PrivateKeyElement{}
+	if _, err = asn1.Unmarshal(privateKey[0].FullBytes, &privKeyEl); err != nil {
+		log.WithError(err).Error("failed to unmarshal ASN.1")
+		ape.RenderErr(w, problems.InternalError())
+		return
+	}
+
+	if err := validatePubSignals(cfg, req.Data, privKeyEl.OctetStr.Bytes); err != nil {
+		log.WithError(err).Error("failed to validate pub signals")
 		ape.RenderErr(w, problems.BadRequest(err)...)
 		return
 	}
 
 	if err := validateCert(cert, cfg.MasterCerts); err != nil {
-		Log(r).WithError(err).Error("failed to validate certificate")
+		log.WithError(err).Error("failed to validate certificate")
 		ape.RenderErr(w, problems.BadRequest(err)...)
 		return
 	}
 
-	masterQ := MasterQ(r)
+	masterQ := api.MasterQ(r)
 
 	claim, err := masterQ.Claim().ResetFilter().
 		FilterBy("user_did", req.Data.ID.String()).
 		Get()
 	if err != nil {
-		Log(r).WithError(err).Error("failed to get claim by user DID")
+		log.WithError(err).Error("failed to get claim by user DID")
 		ape.RenderErr(w, problems.InternalError())
 		return
 	}
@@ -171,25 +201,25 @@ func CreateIdentity(w http.ResponseWriter, r *http.Request) {
 
 	identityExpiration, err := getExpirationTimeFromPubSignals(req.Data.ZKProof.PubSignals)
 	if err != nil {
-		Log(r).WithError(err).Error("failed to get expiration time")
+		log.WithError(err).Error("failed to get expiration time")
 		ape.RenderErr(w, problems.BadRequest(err)...)
 		return
 	}
 
 	issuingAuthority, err := strconv.Atoi(req.Data.ZKProof.PubSignals[2])
 	if err != nil {
-		Log(r).WithError(err).Error("failed to convert string to int")
+		log.WithError(err).Error("failed to convert string to int")
 		ape.RenderErr(w, problems.InternalError())
 		return
 	}
 
 	var claimID string
-	iss := Issuer(r)
-	vaultClient := VaultClient(r)
+	iss := api.Issuer(r)
+	vaultClient := api.VaultClient(r)
 
 	blinder, err := vaultClient.Blinder()
 	if err != nil {
-		Log(r).WithError(err).Error("failed to get blinder from the vault")
+		log.WithError(err).Error("failed to get blinder from the vault")
 		ape.RenderErr(w, problems.InternalError())
 		return
 	}
@@ -199,26 +229,26 @@ func CreateIdentity(w http.ResponseWriter, r *http.Request) {
 	salt := new(big.Int).SetUint64(uint64(time.Now().UTC().UnixMilli()))
 	documentHash, err := poseidon.HashBytes(signedAttributes)
 	if err != nil {
-		Log(r).WithError(err).Error("failed to hash signed attributes")
+		log.WithError(err).Error("failed to hash signed attributes")
 		ape.RenderErr(w, problems.InternalError())
 		return
 	}
 
 	nullifier, err := poseidon.Hash([]*big.Int{documentHash, blinder, salt})
 	if err != nil {
-		Log(r).WithError(err).Error("failed to build nullifier")
+		log.WithError(err).Error("failed to build nullifier")
 		ape.RenderErr(w, problems.InternalError())
 		return
 	}
 
 	existing, err := masterQ.Claim().FilterBy("document_hash", documentHash.String()).Get()
 	if err != nil {
-		Log(r).WithError(err).Error("failed to get claim by document hash")
+		log.WithError(err).Error("failed to get claim by document hash")
 		ape.RenderErr(w, problems.InternalError())
 		return
 	}
 	if existing != nil {
-		log := Log(r).WithField("document_hash", documentHash.String())
+		log = log.WithField("document_hash", documentHash.String())
 		if existing.IsBanned {
 			log.Info("user of the provided document is banned")
 			ape.RenderErr(w, problems.InternalError())
@@ -273,7 +303,7 @@ func CreateIdentity(w http.ResponseWriter, r *http.Request) {
 
 		return nil
 	}); err != nil {
-		Log(r).WithError(err).Error("failed to execute SQL transaction")
+		log.WithError(err).Error("failed to execute SQL transaction")
 		// error was rendered beforehand
 		return
 	}
@@ -343,7 +373,11 @@ func validateSignedAttributes(signedAttributes, encapsulatedContent []byte, algo
 	}
 
 	if !bytes.Equal(digestAttr.Digest[0].Bytes, d) {
-		return errors.New("digest signed attribute is not equal to encapsulated content hash")
+		return errors.From(errors.New("digest signed attribute is not equal to encapsulated content hash"), logan.F{
+			"signed_attributes":    hex.EncodeToString(digestAttr.Digest[0].Bytes),
+			"content_hash":         hex.EncodeToString(d),
+			"encapsulated_content": hex.EncodeToString(encapsulatedContent),
+		})
 	}
 	return nil
 }

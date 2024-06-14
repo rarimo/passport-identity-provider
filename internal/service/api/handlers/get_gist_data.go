@@ -6,50 +6,75 @@ import (
 	"net/http"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/iden3/contracts-abi/state/go/abi"
 	core "github.com/iden3/go-iden3-core/v2"
 	"github.com/iden3/go-iden3-core/v2/w3c"
+	"github.com/rarimo/passport-identity-provider/internal/service/api"
 	"github.com/rarimo/passport-identity-provider/internal/service/api/requests"
 	"github.com/rarimo/passport-identity-provider/resources"
 	"gitlab.com/distributed_lab/ape"
 	"gitlab.com/distributed_lab/ape/problems"
+	"gitlab.com/distributed_lab/logan/v3"
+	"gitlab.com/distributed_lab/logan/v3/errors"
 )
 
 func GetGistData(w http.ResponseWriter, r *http.Request) {
 	req, err := requests.NewGetGistDataRequest(r)
 	if err != nil {
+		api.Log(r).WithError(err).Error("failed to parse get gist data request")
 		ape.RenderErr(w, problems.BadRequest(err)...)
 		return
 	}
 
+	log := api.Log(r).WithFields(logan.F{
+		"user-agent":   r.Header.Get("User-Agent"),
+		"user_did":     req.UserDID,
+		"block_number": req.BlockNumber,
+	})
+
 	userDID, err := w3c.ParseDID(req.UserDID)
 	if err != nil {
-		Log(r).WithError(err).Error("failed to parse user DID")
+		log.WithError(err).Error("failed to parse user DID")
 		ape.RenderErr(w, problems.BadRequest(err)...)
 		return
 	}
 
 	userID, err := core.IDFromDID(*userDID)
 	if err != nil {
-		Log(r).WithError(err).Error("failed to parse user ID")
+		log.WithError(err).Error("failed to parse user ID")
 		ape.RenderErr(w, problems.InternalError())
 		return
 	}
 
-	blockNum, err := EthClient(r).BlockNumber(context.Background())
+	blockNum, err := api.EthClient(r).BlockNumber(context.Background())
 	if err != nil {
-		Log(r).WithError(err).Error("failed to get block number")
+		log.WithError(err).Error("failed to get block number")
 		ape.RenderErr(w, problems.InternalError())
 		return
 	}
 
-	stateContract := StateContract(r)
+	if req.BlockNumber > blockNum {
+		log.WithFields(logan.F{
+			"latest_block_number": blockNum,
+		}).Error("Requested block number is higher than latest")
+		ape.RenderErr(w, problems.BadRequest(validation.Errors{
+			"/block_number": errors.New("Requested block number is higher than latest"),
+		})...)
+		return
+	}
+
+	if req.BlockNumber != 0 {
+		blockNum = req.BlockNumber
+	}
+
+	stateContract := api.StateContract(r)
 
 	gistProof, err := stateContract.GetGISTProof(&bind.CallOpts{
 		BlockNumber: new(big.Int).SetUint64(blockNum),
 	}, userID.BigInt())
 	if err != nil {
-		Log(r).WithError(err).Error("failed to get GIST proof")
+		log.WithError(err).Error("failed to get GIST proof")
 		ape.RenderErr(w, problems.InternalError())
 		return
 	}
@@ -58,9 +83,16 @@ func GetGistData(w http.ResponseWriter, r *http.Request) {
 		BlockNumber: new(big.Int).SetUint64(blockNum),
 	})
 	if err != nil {
-		Log(r).WithError(err).Error("failed to get GIST root")
+		log.WithError(err).Error("failed to get GIST root")
 		ape.RenderErr(w, problems.InternalError())
 		return
+	}
+
+	if gistProof.Root.Cmp(gistRoot) != 0 {
+		log.WithFields(logan.F{
+			"gist_root":       gistRoot.String(),
+			"gist_proof_root": gistProof.Root.String(),
+		}).Warn("gist root does not match")
 	}
 
 	response := newGistDataResponse(req.UserDID, gistProof, gistRoot)
