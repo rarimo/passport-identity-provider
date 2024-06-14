@@ -3,6 +3,7 @@ package pg
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 
 	sq "github.com/Masterminds/squirrel"
 	"github.com/fatih/structs"
@@ -11,7 +12,11 @@ import (
 	"gitlab.com/distributed_lab/kit/pgdb"
 )
 
-const claimsTableName = "claims"
+const (
+	claimsTableName = "claims"
+
+	DocumentHashColumn = "document_hash"
+)
 
 var (
 	claimsSelector = sq.Select("*").From(claimsTableName)
@@ -99,5 +104,26 @@ func (q *claimsQ) ResetFilter() data.ClaimQ {
 	q.sel = claimsSelector
 	q.upd = claimsUpdate
 	q.count = claimsCounter
+	return q
+}
+
+func (q *claimsQ) DistinctOn(column string) data.ClaimQ {
+	var option = fmt.Sprintf("DISTINCT ON (%s)", column)
+	q.sel = q.sel.Options(option)
+	q.count = q.count.Options(option)
+
+	return q
+}
+
+func (q *claimsQ) GroupBy(columns ...string) data.ClaimQ {
+	q.sel = q.sel.GroupBy(columns...)
+	q.count = q.count.GroupBy(columns...)
+
+	return q
+}
+
+func (q *claimsQ) Page(pageParams pgdb.OffsetPageParams, column string) data.ClaimQ {
+	q.sel = pageParams.ApplyTo(q.sel, column)
+
 	return q
 }
