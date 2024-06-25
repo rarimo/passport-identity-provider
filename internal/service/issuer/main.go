@@ -60,7 +60,7 @@ func (is *Issuer) IssueVotingClaim(
 			DocumentNullifier: nullifier.String(),
 			CredentialHash:    credentialHash.String(),
 		},
-		Expiration:     expiration,
+		//Expiration:     expiration,
 		MtProof:        true,
 		SignatureProof: true,
 	}
