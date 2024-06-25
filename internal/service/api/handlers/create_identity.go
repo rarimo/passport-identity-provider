@@ -486,7 +486,8 @@ func validateCert(cert *x509.Certificate, masterCertsPem []byte) error {
 	roots.AppendCertsFromPEM(masterCertsPem)
 
 	foundCerts, err := cert.Verify(x509.VerifyOptions{
-		Roots: roots,
+		Roots:       roots,
+		CurrentTime: time.Unix(1561467563, 0), // Tuesday, June 25, 2019 12:59:23
 	})
 	if err != nil {
 		return fmt.Errorf("invalid certificate: %w", err)
