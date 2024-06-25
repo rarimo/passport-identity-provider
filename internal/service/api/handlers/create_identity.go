@@ -41,6 +41,7 @@ const (
 	SHA1   = "sha1"
 	SHA256 = "sha256"
 
+	SHA1withRSA     = "SHA1withRSA"
 	SHA256withRSA   = "SHA256withRSA"
 	SHA1withECDSA   = "SHA1withECDSA"
 	SHA256withECDSA = "SHA256withECDSA"
@@ -49,6 +50,7 @@ const (
 var algorithmsListMap = map[string]map[string]string{
 	"SHA1": {
 		"ECDSA": SHA1withECDSA,
+		"RSA":   SHA1withRSA,
 	},
 	"SHA256": {
 		"RSA":   SHA256withRSA,
@@ -120,7 +122,7 @@ func CreateIdentity(w http.ResponseWriter, r *http.Request) {
 	cfg := api.VerifierConfig(r)
 
 	switch algorithm {
-	case SHA1withECDSA:
+	case SHA1withRSA, SHA1withECDSA:
 		if err := verifier.VerifyGroth16(req.Data.ZKProof, cfg.VerificationKeys[SHA1]); err != nil {
 			log.WithError(err).Error("failed to verify Groth16")
 			ape.RenderErr(w, problems.BadRequest(err)...)
@@ -356,7 +358,7 @@ func validateSignedAttributes(signedAttributes, encapsulatedContent []byte, algo
 
 	d := make([]byte, 0)
 	switch algorithm {
-	case SHA1withECDSA:
+	case SHA1withRSA, SHA1withECDSA:
 		h := sha1.New()
 		h.Write(encapsulatedContent)
 		d = h.Sum(nil)
@@ -384,6 +386,10 @@ func validateSignedAttributes(signedAttributes, encapsulatedContent []byte, algo
 
 func signatureAlgorithm(passedAlgorithm string) string {
 	if passedAlgorithm == "rsaEncryption" {
+		return SHA256withRSA
+	}
+
+	if passedAlgorithm == "RSA" {
 		return SHA256withRSA
 	}
 
@@ -428,6 +434,16 @@ func verifySignature(req requests.CreateIdentityRequest, cert *x509.Certificate,
 	}
 
 	switch algo {
+	case SHA1withRSA:
+		pubKey := cert.PublicKey.(*rsa.PublicKey)
+
+		h := sha1.New()
+		h.Write(signedAttributes)
+		d := h.Sum(nil)
+
+		if err := rsa.VerifyPKCS1v15(pubKey, crypto.SHA1, d, signature); err != nil {
+			return errors.Wrap(err, "failed to verify SHA256 with RSA signature")
+		}
 	case SHA256withRSA:
 		pubKey := cert.PublicKey.(*rsa.PublicKey)
 
