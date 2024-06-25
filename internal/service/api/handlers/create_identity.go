@@ -442,7 +442,7 @@ func verifySignature(req requests.CreateIdentityRequest, cert *x509.Certificate,
 		d := h.Sum(nil)
 
 		if err := rsa.VerifyPKCS1v15(pubKey, crypto.SHA1, d, signature); err != nil {
-			return errors.Wrap(err, "failed to verify SHA256 with RSA signature")
+			return errors.Wrap(err, "failed to verify SHA1 with RSA signature")
 		}
 	case SHA256withRSA:
 		pubKey := cert.PublicKey.(*rsa.PublicKey)
