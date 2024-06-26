@@ -508,9 +508,9 @@ func validatePubSignals(
 		return errors.Wrap(err, "failed to validate DG1 hash")
 	}
 
-	//if err := validatePubSignalsCurrentDate(requestData.ZKProof.PubSignals); err != nil {
-	//	return fmt.Errorf("invalid current date: %w", err)
-	//}
+	if err := validatePubSignalsCurrentDate(requestData.ZKProof.PubSignals); err != nil {
+		return fmt.Errorf("invalid current date: %w", err)
+	}
 
 	if err := validatePubSignalsAge(cfg, requestData.ZKProof.PubSignals[9]); err != nil {
 		return errors.Wrap(err, "failed to validate pub signals age")
